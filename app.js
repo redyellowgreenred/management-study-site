@@ -124,11 +124,11 @@ function initLab(el,print=false){
   ownership:{title:'资产与投资激励',defaults:{A:2,B:1,theta:.6,owner:'buyer'},inputs:[['A','买方投入效率 A',.5,3,.1],['B','卖方投入效率 B',.5,3,.1],['theta','保留价值比例 θ',0,1,.05]]}
  };
  const def=defs[type];if(!def)return;
- const mission=!print?window.COURSE.labMissions?.[type]:null;
+ const mission=window.COURSE.labMissions?.[type];
  const values={...def.defaults,...(print?{}:state.labs[type])};
  const select=type==='ownership'?'<label for="owner-select">当前所有者</label><select id="owner-select"><option value="buyer">买方拥有资产</option><option value="seller">卖方拥有资产</option></select>':'';
  el.className='experiment';
- const missionHTML=mission?'<section class="lab-mission"><h3>用这个情境试一次</h3><p>'+mission.question+'</p><div class="mission-options" role="group" aria-label="选择你的预测">'+mission.options.map((option,i)=>'<button data-mission-choice="'+i+'" aria-pressed="false">'+option+'</button>').join('')+'</div><div class="mission-actions"><button data-mission-start>设置题目起点</button><button class="primary" data-mission-run disabled>选择后运行情境</button></div><div data-mission-feedback class="feedback" aria-live="polite" hidden></div></section>':'';
+ const missionHTML=mission?(print?'<section class="lab-mission-print"><h3>情境题与参考答案</h3><p>'+mission.question+'</p><p><strong>参考答案：</strong>'+mission.options[mission.answer]+'。'+mission.explanation+'</p></section>':'<section class="lab-mission"><h3>用这个情境试一次</h3><p>'+mission.question+'</p><div class="mission-options" role="group" aria-label="选择你的预测">'+mission.options.map((option,i)=>'<button data-mission-choice="'+i+'" aria-pressed="false">'+option+'</button>').join('')+'</div><div class="mission-actions"><button data-mission-start>设置题目起点</button><button class="primary" data-mission-run disabled>选择后运行情境</button></div><div data-mission-feedback class="feedback" aria-live="polite" hidden></div></section>'):'';
  el.innerHTML='<h2>'+def.title+'</h2>'+missionHTML+select+'<div class="controls">'+def.inputs.map(([key,label,min,max,step])=>control(key,label,min,max,step,values[key])).join('')+'</div>'+(type==='agency'?'<button data-optimal>使用最优奖金</button>':'')+'<button data-reset>恢复初始参数</button><div class="exp-result" aria-live="polite"></div><div class="plot" tabindex="0" role="region" aria-label="实验图形，可横向滚动"></div><div class="chart-caption"></div>';
  const result=el.querySelector('.exp-result'),plot=el.querySelector('.plot'),caption=el.querySelector('.chart-caption');
  const sel=el.querySelector('select');if(sel)sel.value=values.owner;
@@ -169,7 +169,7 @@ function initLab(el,print=false){
  sel?.addEventListener('change',()=>{values.owner=sel.value;update();});
  el.querySelector('[data-reset]').onclick=()=>{Object.assign(values,def.defaults);if(sel)sel.value=values.owner;update();};
  el.querySelector('[data-optimal]')?.addEventListener('click',()=>{values.b=M.agency(values).bStar;update();});
- if(mission){
+ if(mission&&!print){
   let choice=null;const feedback=el.querySelector('[data-mission-feedback]'),run=el.querySelector('[data-mission-run]'),options=[...el.querySelectorAll('[data-mission-choice]')];
   const clear=()=>{feedback.hidden=true;};
   options.forEach(button=>button.addEventListener('click',()=>{choice=Number(button.dataset.missionChoice);options.forEach(b=>b.setAttribute('aria-pressed',String(b===button)));run.disabled=false;run.textContent='运行这一情境';clear();}));
