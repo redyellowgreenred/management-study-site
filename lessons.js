@@ -1,491 +1,1265 @@
-(function(){
-'use strict';
-const eq=(x,label='')=>'<div class="math">'+(label?'<div class="math-label">'+label+'</div>':'')+'$$'+x+'$$</div>';
-const box=(x,type='')=>'<div class="callout '+type+'">'+x+'</div>';
-const det=(title,x)=>'<details><summary>'+title+'</summary>'+x+'</details>';
-const tbl=(headers,rows)=>'<div class="table-wrap"><table><thead><tr>'+headers.map(x=>'<th>'+x+'</th>').join('')+'</tr></thead><tbody>'+rows.map(r=>'<tr>'+r.map(x=>'<td>'+x+'</td>').join('')+'</tr>').join('')+'</tbody></table></div>';
-const P=(id,title,phase,minutes,parts,more={})=>({id,title,phase,minutes,body:parts.join(''),...more});
-const Q=(id,prompt,options,answer,explanation)=>({id,prompt,options,answer,explanation});
-const N=(id,prompt,answer,tolerance,explanation)=>({id,prompt,answer,tolerance,explanation,numeric:true});
-const sources={
- H79:{label:'Holmström (1979). Moral Hazard and Observability. The Bell Journal of Economics, 10(1), 74–91.',url:'https://doi.org/10.2307/3003320',note:'信息性原则的原始论文；期刊全文可能需要访问权限。'},
- HM87:{label:'Holmström & Milgrom (1987). Aggregation and Linearity in the Provision of Intertemporal Incentives. Econometrica, 55(2), 303–328.',url:'https://doi.org/10.2307/1913238',note:'线性激励的动态基础。本文不把其结论直接推广到一般静态合同。'},
- HM91:{label:'Holmström & Milgrom (1991). Multitask Principal–Agent Analyses: Incentive Contracts, Asset Ownership, and Job Design. JLEO, 7, 24–52.',url:'https://web.stanford.edu/~milgrom/publishedarticles/Multitask%20Principal%20Agent.pdf',note:'作者托管全文。任务替代、绩效测量和工作设计的经典分析。'},
- STOLE:{label:'Stole. Lectures on the Theory of Contracts, §2.1.1–2.1.4. MIT 14.124 课程讲义。',url:'https://ocw.mit.edu/courses/14-124-microeconomic-theory-iv-spring-2017/be21e9cc762231c50ab42bbf35ead5db_MIT14_124S17_LecNote1_2.pdf',note:'隐藏行动、团队、线性合同与多任务模型；按小节检索。'},
- DUKE:{label:'Duke University. Multitask Principal-Agent Model，博士研讨课讲义，pp. 2–4。',url:'https://people.duke.edu/~rampini/handouts/notesholmstrommilgrom1991.pdf',note:'可核对确定性等价、任务交叉效应和矩阵表达。'},
- H82:{label:'Holmström (1982). Moral Hazard in Teams. The Bell Journal of Economics, 13(2), 324–340.',url:'https://people.duke.edu/~qc2/BA532/1982%20Rand%20Holmstrom%20team.pdf',note:'大学托管原文。团队预算、搭便车与外部预算执行者。'},
- BORDER:{label:'Border (2004). Moral Hazard in Teams. Caltech 教学笔记。',url:'https://healy.econ.ohio-state.edu/kcb/Notes/MoralHazardTeams.pdf',note:'原论文证明的补充；本讲只证明光滑分享规则下的版本。'},
- GH86:{label:'Grossman & Hart (1986). The Costs and Benefits of Ownership: A Theory of Vertical and Lateral Integration. JPE, 94(4), 691–719.',url:'https://dash.harvard.edu/entities/publication/73120378-84bb-6bd4-e053-0100007fdf3b',note:'Harvard 机构仓储，含原文 PDF。产权影响投资激励的基础论文。'},
- HART:{label:'Hart (2016). Incomplete Contracts and Control. Nobel Prize Lecture.',url:'https://www.nobelprize.org/uploads/2018/06/hart-lecture.pdf',note:'作者对剩余控制权、资产所有权和企业边界的说明。'},
- PRINCETON:{label:'Rossi-Hansberg. Incomplete Contracts and International Trade. Princeton Economics 552, Lecture 1.',url:'https://www.princeton.edu/~erossi/Trade/Week1_552.pdf',note:'不完全契约、外部选项及事前投资的教学框架。'},
- MITBOUND:{label:'MIT 15.575. Incomplete Contracts & Firm Boundaries，课程讲义。',url:'https://ocw.mit.edu/courses/15-575-research-seminar-in-it-and-organizations-economic-perspectives-spring-2004/5c9135b7a4e53ac108e0367185b5f0f6_15575incpl_cntrt.pdf',note:'企业整合如何通过产权和议价改变激励。'},
- AH11:{label:'Aghion & Holden (2011). Incomplete Contracts and the Theory of the Firm: What Have We Learned over the Past 25 Years? JEP, 25(2), 181–197.',url:'https://pubs.aeaweb.org/doi/10.1257/jep.25.2.181',note:'研究者综述：理论含义、争议和适用边界。'}
+// 中文组织经济学讲义。例子、问题树和推导均为自编；理论出处集中在末章。
+window.COURSE = {
+  "sources": {
+    "H79": {
+      "label": "Holmström (1979). Moral Hazard and Observability. The Bell Journal of Economics, 10(1), 74–91.",
+      "url": "https://doi.org/10.2307/3003320",
+      "note": "信息性原则的原始论文；期刊全文可能需要访问权限。"
+    },
+    "HM87": {
+      "label": "Holmström & Milgrom (1987). Aggregation and Linearity in the Provision of Intertemporal Incentives. Econometrica, 55(2), 303–328.",
+      "url": "https://doi.org/10.2307/1913238",
+      "note": "线性激励的动态基础。本文不把其结论直接推广到一般静态合同。"
+    },
+    "HM91": {
+      "label": "Holmström & Milgrom (1991). Multitask Principal–Agent Analyses: Incentive Contracts, Asset Ownership, and Job Design. JLEO, 7, 24–52.",
+      "url": "https://web.stanford.edu/~milgrom/publishedarticles/Multitask%20Principal%20Agent.pdf",
+      "note": "作者托管全文。任务替代、绩效测量和工作设计的经典分析。"
+    },
+    "STOLE": {
+      "label": "Stole. Lectures on the Theory of Contracts, §2.1.1–2.1.4. MIT 14.124 课程讲义。",
+      "url": "https://ocw.mit.edu/courses/14-124-microeconomic-theory-iv-spring-2017/be21e9cc762231c50ab42bbf35ead5db_MIT14_124S17_LecNote1_2.pdf",
+      "note": "隐藏行动、团队、线性合同与多任务模型；按小节检索。"
+    },
+    "DUKE": {
+      "label": "Duke University. Multitask Principal-Agent Model，博士研讨课讲义，pp. 2–4。",
+      "url": "https://people.duke.edu/~rampini/handouts/notesholmstrommilgrom1991.pdf",
+      "note": "可核对确定性等价、任务交叉效应和矩阵表达。"
+    },
+    "H82": {
+      "label": "Holmström (1982). Moral Hazard in Teams. The Bell Journal of Economics, 13(2), 324–340.",
+      "url": "https://people.duke.edu/~qc2/BA532/1982%20Rand%20Holmstrom%20team.pdf",
+      "note": "大学托管原文。团队预算、搭便车与外部预算执行者。"
+    },
+    "BORDER": {
+      "label": "Border (2004). Moral Hazard in Teams. Caltech 教学笔记。",
+      "url": "https://healy.econ.ohio-state.edu/kcb/Notes/MoralHazardTeams.pdf",
+      "note": "原论文证明的补充；本讲只证明光滑分享规则下的版本。"
+    },
+    "GH86": {
+      "label": "Grossman & Hart (1986). The Costs and Benefits of Ownership: A Theory of Vertical and Lateral Integration. JPE, 94(4), 691–719.",
+      "url": "https://dash.harvard.edu/entities/publication/73120378-84bb-6bd4-e053-0100007fdf3b",
+      "note": "Harvard 机构仓储，含原文 PDF。产权影响投资激励的基础论文。"
+    },
+    "HART": {
+      "label": "Hart (2016). Incomplete Contracts and Control. Nobel Prize Lecture.",
+      "url": "https://www.nobelprize.org/uploads/2018/06/hart-lecture.pdf",
+      "note": "作者对剩余控制权、资产所有权和企业边界的说明。"
+    },
+    "PRINCETON": {
+      "label": "Rossi-Hansberg. Incomplete Contracts and International Trade. Princeton Economics 552, Lecture 1.",
+      "url": "https://www.princeton.edu/~erossi/Trade/Week1_552.pdf",
+      "note": "不完全契约、外部选项及事前投资的教学框架。"
+    },
+    "MITBOUND": {
+      "label": "MIT 15.575. Incomplete Contracts & Firm Boundaries，课程讲义。",
+      "url": "https://ocw.mit.edu/courses/15-575-research-seminar-in-it-and-organizations-economic-perspectives-spring-2004/5c9135b7a4e53ac108e0367185b5f0f6_15575incpl_cntrt.pdf",
+      "note": "企业整合如何通过产权和议价改变激励。"
+    },
+    "AH11": {
+      "label": "Aghion & Holden (2011). Incomplete Contracts and the Theory of the Firm: What Have We Learned over the Past 25 Years? JEP, 25(2), 181–197.",
+      "url": "https://pubs.aeaweb.org/doi/10.1257/jep.25.2.181",
+      "note": "研究者综述：理论含义、争议和适用边界。"
+    }
+  },
+  "chapters": [
+    {
+      "id": "orientation",
+      "number": "00",
+      "title": "开始之前",
+      "short": "学习方法与数学准备",
+      "duration": "5–8 分钟",
+      "pages": [
+        {
+          "id": "start",
+          "title": "为什么组织总在跟自己较劲？",
+          "phase": "课程说明",
+          "minutes": 3,
+          "body": "<p>你请人办事，钱付了，事情却不一定照你想的方向走。给销售加提成，担心他只顾成交；几个人一起做项目，又怕谁都等着别人出力。真把供应商买下来，以为从此可以统一指挥，才发现关键的人未必愿意认真干了。</p><p>这些麻烦有一个共同点：<strong>你需要别人作出某种选择，却不能直接替他选。</strong>工资、考核、分成和产权，都是试图影响这个选择的办法。组织理论中偏数学的一支，就研究这些办法什么时候有效，又会付出什么代价。</p><p>下面四章各追一件事。每章先把问题讲到可以争论，再拆成几个需要依次回答的小问题。数字能说清楚时先算数字；等同一个问题需要反复计算，才把它写成公式。</p><div id=\"course-route\" class=\"route\"></div><p>可以从第一章开始。不需要先读完一套数学基础：求导会在第一次比较“多努力一点值不值”时解释，风险会在员工开始担心收入波动时出现，议价则等到双方真的需要分钱再讲。</p><p>翻页用下方按钮或左右方向键。练习可以反复做，实验可以拖动参数。文献集中放在末章，打印版会把练习答案一起展开。例子是为推理编的，别把其中的数字当作现实企业的数据。</p>",
+          "refs": [
+            "STOLE",
+            "HM91",
+            "H82",
+            "GH86"
+          ]
+        },
+        {
+          "id": "method",
+          "title": "四个问题为什么要按这个顺序讲？",
+          "phase": "学习目标",
+          "minutes": 3,
+          "body": "<p>先设想一家小公司。起初只有一个老板、一个员工，老板最头疼的是工资怎么开。这就是第一章：<strong>结果受努力影响，也受运气影响，奖金该和结果绑多紧？</strong></p><p>后来老板发现，员工既要把事情做快，也要把事情做好。只奖励快，质量可能出问题。第二章便把第一章的一个假设拿掉：一个人不只做一件事。现在要问，<strong>奖金会把他的注意力引到哪里？</strong></p><p>再后来，一个人的活变成几个人合作，最后却只看得到共同结果。第三章继续追问：<strong>如果每个人只能分到一部分成果，他还愿不愿承担全部努力成本？</strong></p><p>公司需要跟外部伙伴合作，甚至考虑收购。第四章把时间拉长：<strong>如果今天的投入要等明天谈判后才能拿到回报，谁还愿意先投入？把资产交给谁，会改变这个决定吗？</strong></p><p>四章都先站到作决定的那个人一边，把他的账算出来，再回头看组织想要的结果。很多看上去“执行不到位”的事，到了这一步，会变成一个更具体的问题：多做一点的收益，究竟落在谁手里。</p>",
+          "refs": [
+            "STOLE",
+            "DUKE",
+            "BORDER",
+            "PRINCETON"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "agency",
+      "number": "01",
+      "title": "委托—代理：激励与保险",
+      "short": "奖金为什么不能只看努力",
+      "duration": "40–60 分钟",
+      "pages": [
+        {
+          "id": "a-question",
+          "title": "提成越高，员工就越卖力，事情有这么简单吗？",
+          "phase": "工资该怎么开",
+          "minutes": 2,
+          "body": "<p>假设你开了一家维修店，准备请一位师傅。你当然希望他认真接活，但你不可能整天站在旁边，看他每一步有没有尽力。比较容易记账的是最后修好了多少台机器、收了多少钱。</p><p>你想到两种工资：一种每月固定，另一种底薪很少，主要靠提成。后一种看起来更能让他上心。多修一台就多拿钱，似乎没什么可犹豫的。</p><p>师傅却问了一句：要是这个月附近修路，客人进不来呢？我还是一样干活，收入却掉下去了，这也全算我的？</p><p>他说得有道理。把收入绑在业绩上，确实给了他多做事的理由，也让他承担了自己管不着的波动。问题因此变成：<strong>要让他愿意努力，又不必为让他承担风险花太多钱，提成究竟该定多高？</strong></p><p>这就是本章要解决的事。暂时只看一种工作，不讨论他会不会为赶数量省掉复检；那个麻烦留到下一章。</p>",
+          "refs": [
+            "STOLE",
+            "H79"
+          ],
+          "question": -1
+        },
+        {
+          "id": "a-map",
+          "title": "先别定提成，四件事得按顺序想清楚",
+          "phase": "继续追问",
+          "minutes": 3,
+          "body": "<p>直接问“提成该给百分之几”，现在还答不了。因为我们连多做多少才值得，都没有说清楚。可以把这个决定拆成四问。</p><ol class=\"question-tree\"><li><strong>从整件事看，做多少才划算？</strong><p>多干活会多收钱，也会更累。先找一个值得追求的努力水平，后面才知道工资方案有没有做到。</p></li><li><strong>给定提成，师傅自己会怎么选？</strong><p>他多做一台，只拿到其中的提成，却要承受自己增加的辛苦。老板想要的和他愿意做的，可能不一样。</p></li><li><strong>这份工资，他愿意接受吗？</strong><p>除了平均能拿多少，他还会看收入稳不稳定，以及别处能给什么条件。</p></li><li><strong>把前面三问合起来，公司该给多少？</strong><p>此时才轮到公司算账：奖金换来的额外努力，是否值得它支付的全部成本？</p></li></ol><p>这四问有先后关系。跳过第二问，就等于假定员工一定按老板的想法做；跳过第三问，就可能算出一份根本没人愿意签的合同。</p>",
+          "refs": [
+            "STOLE"
+          ],
+          "question": -1
+        },
+        {
+          "id": "a-numbers",
+          "title": "先算三笔账：多干活到底值不值？",
+          "phase": "继续追问",
+          "minutes": 3,
+          "body": "<p>先把工资和运气放一边。假设一次额外的工作机会有三种做法，能创造的价值和师傅为此付出的成本如下。这里的成本把时间、劳累等折成同一种货币单位，只为比较方便。</p><div class=\"table-wrap\"><table><thead><tr><th>做法</th><th>增加的价值</th><th>增加的努力成本</th><th>扣完成本还剩多少</th></tr></thead><tbody><tr><td>不额外投入</td><td>0</td><td>0</td><td>0</td></tr><tr><td>适度投入</td><td>100</td><td>40</td><td>60</td></tr><tr><td>拼到极限</td><td>150</td><td>120</td><td>30</td></tr></tbody></table></div><p>适度投入创造的净收益最高。拼到极限虽然产出更多，多出来的辛苦却更贵。就这组数字而言，值得追求的不是最高产出，而是扣掉真实代价之后剩得最多的做法。</p><p>再看一件容易混在一起的事：若公司多发给师傅 20，公司少 20，师傅多 20，两人合起来并没有因此多创造 20。工资决定这块收益怎么分；努力成本则真的消耗了资源。</p><p>后面所谓“第一最佳”，说的就是先不管工资能不能诱导出来，只问双方合起来，怎样做最划算。接下来把三个离散选择换成可以连续调整的努力。</p>",
+          "refs": [
+            "STOLE"
+          ],
+          "question": -1
+        },
+        {
+          "id": "a-firstbest",
+          "title": "第一问：多做一点，还划算吗？",
+          "phase": "第一最佳",
+          "minutes": 3,
+          "body": "<p>用一个字母 $e$ 表示努力。把单位换好，使多一单位努力能增加 1 单位价值。辛苦不会总以同样速度增加：已经很累时再往上加一点，往往更难。我们用二次成本 $ce^2/2$ 表示这种递增的边际成本，$c&gt;0$。</p><div class=\"math\">$$W(e)=e-@frac c2e^2$$</div><p>这个式子只是在做上一页的减法：价值减真实成本。现在问，努力在当前位置上再增加一点，会怎样？新增价值是 1，新增成本约为 $ce$。只要前者更大，就还值得增加。</p><div class=\"math\">$$1-ce=0@quad@Rightarrow@quad e^{FB}=@frac1c$$</div><p>如果你没学过求导，可以把它理解为找“再往前一步就不合算”的位置；求导把这个比较写成了精确的边际条件。二阶导数是 $-c&lt;0$，保证这里确实是最大值。</p><p>这个结果叫第一最佳，FB 是 first best。它给了我们一把尺子。接下来要检查：师傅按自己的账选努力时，能不能走到这里。</p>",
+          "refs": [
+            "STOLE"
+          ],
+          "quiz": [
+            {
+              "id": "a-fb",
+              "prompt": "若 $c=2$，第一最佳努力是多少？",
+              "answer": 0.5,
+              "tolerance": 0.001,
+              "explanation": "最大化 $e-e^2$，得到 $1-2e=0$，所以 $e^{FB}=0.5$。",
+              "numeric": true
+            }
+          ],
+          "question": 0
+        },
+        {
+          "id": "a-model",
+          "title": "第二问：把工资开出来，他会怎么选？",
+          "phase": "模型假设",
+          "minutes": 4,
+          "body": "<p>先不加市场波动。记产出为 $y$，暂时令它等于努力 $e$。工资由底薪 $a$ 和每单位产出的奖金 $b$ 构成：</p><div class=\"math\">$$w=a+by,@qquad y=e$$</div><p>例如 $a=100,b=0.3$，意思是先拿 100，产出每增加 1，再拿 0.3。这里的 $b$ 是每单位产出的支付额；产出单位价值标准化为 1 后，也可以把它读成分成比例。</p><p>事情按这个顺序发生：公司先给工资方案；师傅选择接不接；接了以后自己决定花多大力气；最后根据产出结钱。公司能执行对产出的支付承诺，却不能直接在合同里写“努力必须是某个数”并保证落实。</p><p>这时公司是委托人，师傅是代理人。术语并不神秘：一方需要另一方替自己办事，但对方仍然会按自己的收益和成本作选择。我们下一步就站到师傅这边，算他的最优选择。</p>",
+          "refs": [
+            "STOLE",
+            "HM87"
+          ],
+          "question": 1
+        },
+        {
+          "id": "a-ic",
+          "title": "只拿三成收入，为什么要承担全部辛苦？",
+          "phase": "激励相容",
+          "minutes": 4,
+          "body": "<p>师傅每多做一点，可以多拿 $b$，但这份努力带来的辛苦都由他承担。给定工资，他要最大化的是自己的收入减自己的成本：</p><div class=\"math\">$$@max_{e@ge0}@;a+be-@frac c2e^2$$</div><p>再多一点努力的好处是 $b$，坏处是 $ce$。两者相等时，他不想再改：</p><div class=\"math\">$$b-ce=0@quad@Rightarrow@quad @boxed{e(b)=b/c}$$</div><p>对照上一页的社会账本：整件事的边际收益是 1，师傅自己拿到的却只有 $b$。所以当 $b&lt;1$ 时，他的努力低于第一最佳；若能让他拿到全部边际收入，两个条件才重合。</p><p>这也是“激励相容”约束的意思，简称 IC：你希望他做的事，得真是他面对这份合同时愿意做的事。不能在公司的方案里写一个低提成，再在计算里假定他仍会全力投入。</p><p>底薪 $a$ 在求导时消失了。在目前没有财富效应的模型里，提高它会让这份工作更值得接受，却不改变多努力一点能多拿多少。接受工作和工作以后怎么干，要分开算。</p>",
+          "refs": [
+            "STOLE"
+          ],
+          "quiz": [
+            {
+              "id": "a-ic-q",
+              "prompt": "公司希望诱导 $e=0.4$，且 $c=2$。线性合同需要什么奖金？",
+              "options": [
+                "$b=0.2$",
+                "$b=0.4$",
+                "$b=0.8$",
+                "单纯提高 $a$ 即可"
+              ],
+              "answer": 2,
+              "explanation": "由 $e=b/c$，得到 $b=ce=0.8$。固定工资不能替代这条边际激励条件。"
+            }
+          ],
+          "question": 1
+        },
+        {
+          "id": "a-risk-start",
+          "title": "既然如此，为什么不把全部收入都给他？",
+          "phase": "继续追问",
+          "minutes": 3,
+          "body": "<p>到这里，一个很诱人的办法已经出现：既然提成不足会让努力偏低，那就给百分之百提成。老板靠一笔固定承包费拿回自己的收益，不就行了？</p><p>在没有风险、师傅也付得起承包费的情况下，这个想法确实说得通。问题是，回到维修店，修路、天气和客流变化又回来了。产出不再只由他决定。</p><p>假设两份工作平均都能让他净拿 100。一份确定给 100；另一份各有一半机会拿 60 或 140。很多人会选前一份。若要他接后一份，可能得再加一点平均报酬。</p><p>这笔额外补偿就是让他承担风险的代价。公司把提成加大，既买到了更多努力，也让员工收入更受外部波动影响。<strong>百分之百提成省下的激励损失，未必抵得过新增的风险补偿。</strong></p><p>下一步只需要一个工具：把一份有风险的收入，换算成他觉得同样值得拿的一笔确定收入。这样才能把两种工资放在一张账上比较。</p>",
+          "refs": [
+            "STOLE",
+            "DUKE"
+          ],
+          "question": 2
+        },
+        {
+          "id": "a-risk",
+          "title": "第三问：波动的工资，值多少确定收入？",
+          "phase": "数学补充",
+          "minutes": 6,
+          "body": "<p>接着上一页的选择。如果一个人愿意用确定拿 90，换掉平均拿 100 的那份波动收入，就说那份收入对他的“确定性等价”是 90。简称 CE。两份东西金额不同，但在他眼里一样值得。</p><p>现在让产出包含运气：$y=e+@varepsilon$。冲击 $@varepsilon$ 的均值为零，标准差为 $@sigma$，并假定它服从正态分布。工资仍为 $a+by$，所以平均工资是 $a+be$，工资方差是 $b^2@sigma^2$。</p><p>还需要说明这个人有多不愿意承担风险。这里选用 CARA 偏好，用 $r$ 表示风险厌恶程度。这个偏好与正态分布搭在一起，给出一个方便且精确的换算：</p><div class=\"math\">$$CE=a+be-@frac c2e^2-@frac r2b^2@sigma^2$$</div><p>前三项是平均收入减辛苦，最后一项是风险让这份收入打的折。员工若要保持相同福利，公司就得补回这笔折价，所以也叫风险溢价。</p><p>看平方就能理解问题：奖金翻倍，收入波动的方差变成四倍，风险补偿也变成四倍。努力的好处却没有按同样速度增长。</p><details><summary>想核对这条换算，再看这里</summary><p>CARA 效用写成 $U(X)=-@exp(-rX)$，这里 $X=w-ce^2/2$。若 $X@sim N(@mu,s^2)$，则 $@mathbb E[e^{-rX}]=e^{-r@mu+r^2s^2/2}$。令确定拿 CE 的效用与这份随机收入的期望效用相等，便有 $CE=@mu-rs^2/2$。这不是对所有分布、所有偏好都成立的恒等式。</p></details><p>这个模型中努力不改变噪声方差，所以风险项不影响员工对努力求导：他的选择仍是 $e=b/c$。风险的影响会通过“为了让他愿意签约，底薪还得补多少”进入公司的账。</p>",
+          "refs": [
+            "DUKE",
+            "STOLE"
+          ],
+          "quiz": [
+            {
+              "id": "a-risk-n",
+              "prompt": "若 $r=2,b=0.5,@sigma=2$，风险溢价 $rb^2@sigma^2/2$ 是多少？",
+              "answer": 1,
+              "tolerance": 0.001,
+              "explanation": "$2@times0.25@times4/2=1$。先对奖金和标准差平方。",
+              "numeric": true
+            }
+          ],
+          "question": 2
+        },
+        {
+          "id": "a-ir",
+          "title": "员工愿意签，公司的账才有意义",
+          "phase": "参与约束",
+          "minutes": 4,
+          "body": "<p>师傅不是只有这一份工作可选。别处的收入、稳定程度和工作负担，可以折成一个外部机会的确定性等价 $u_0$。你开的条件至少要不比它差：</p><div class=\"math\">$$a+be-@frac c2e^2-@frac r2b^2@sigma^2@ge u_0$$</div><p>这叫参与约束，简称 IR。它回答的是第三问：员工愿不愿接受。之前的 IC 则回答接受以后会怎么干，两个约束缺一不可。</p><p>先让公司能够自由调底薪，并假设它有全部议价权。那么给定奖金，公司会把底薪调到员工刚好愿意接受的位置：</p><div class=\"math\">$$a=u_0-be+@frac c2e^2+@frac r2b^2@sigma^2$$</div><p>因此，底薪不能随手定一个数再丢在旁边。奖金让员工平均多拿的部分，可以通过底薪调整；奖金让他多担的风险，也得通过底薪补偿。把这个底薪代回公司“产出减工资”的利润，账本就清楚了：</p><div class=\"math\">$$@Pi=e-@frac c2e^2-@frac r2b^2@sigma^2-u_0$$</div><p>公司最后留下的是：努力创造的价值，减努力成本，减风险补偿，再减员工的外部机会。现在四问里的前三问都有了答案，下一页才轮到选最合算的奖金。</p><details><summary>如果算出负底薪，是什么意思？</summary><p>它相当于员工先交固定承包费，再取得绩效收入。我们暂时允许这种转移，才可以这样求解。若员工付不起、不能收取固定费用，或有最低工资约束，就必须把限制加回去重算。</p></details>",
+          "refs": [
+            "STOLE"
+          ],
+          "question": 2
+        },
+        {
+          "id": "a-optimum",
+          "title": "第四问：多买一点努力，要多付多少风险补偿？",
+          "phase": "核心推导",
+          "minutes": 5,
+          "body": "<p>把答案放在一起。员工的选择是 $e=b/c$；为了让他愿意接受，公司需要支付上一页解出的底薪。于是公司可以只对奖金 $b$ 作选择：</p><div class=\"math\">$$@Pi(b)=@frac bc-@frac{b^2}{2c}-@frac r2b^2@sigma^2-u_0$$</div><p>第一项是诱导出来的产出，第二项是努力成本，第三项是风险补偿。奖金太小，产出损失大；奖金太大，后两项涨得快。利润最高的位置满足：</p><div class=\"math\">$$@Pi^{@prime}(b)=@frac1c-@frac bc-rb@sigma^2=0$$</div><div class=\"math\">$$@boxed{b^*=@frac1{1+rc@sigma^2}},@qquad e^*=@frac1{c(1+rc@sigma^2)}$$</div><p>这时公式终于回答了开头的问题。员工越怕风险，或者业绩越受运气影响，就越需要为强提成付出补偿，最合算的奖金会降低。若风险代价消失，奖金回到 1，之前的全额提成想法又成立了。</p><p>例如成本系数、风险厌恶和噪声标准差都等于 1，答案是 $b^*=0.5$。不是因为“五五开”有什么天然道理，而是这组参数下，多买努力和多付风险补偿恰好在这里平衡。</p><p>这是在线性合同类中求出的最优解。它还用了二次成本、CARA、正态且方差不随努力变的噪声、自由固定转移和风险中性公司这些条件。下一页可以自己改参数，看答案如何变。</p>",
+          "refs": [
+            "STOLE",
+            "DUKE"
+          ],
+          "question": 3
+        },
+        {
+          "id": "a-lab",
+          "title": "把修路的影响调大，工资方案会怎样？",
+          "phase": "参数实验",
+          "minutes": 5,
+          "body": "<p>先用默认参数。把奖金从 0 慢慢往右推：努力一直增加，公司利润却先升后降。到下降那一段，员工并没有更懒；恰好相反，他更努力了，只是获得这些努力的代价太高。</p><div data-lab=\"agency\"></div><p>再把噪声标准差从 1 改成 2，相当于让客流更难预测。点击“使用最优奖金”，它会从 0.5 降到 0.2。注意标准差翻倍，方差是原来的四倍。</p><p>最后把风险厌恶降到 0。外部波动仍然存在，奖金却回到 1。这说明起作用的是员工为承担风险索要的补偿，而不是“有波动就一定不能激励”。</p><details><summary>这里的固定工资为什么一直在变？</summary><p>它跟着奖金调整，使员工 CE 保持为 0。因此图上已经把风险补偿计入公司的支出。若固定工资不能这样调整，这张利润曲线也需要重画。</p></details>",
+          "refs": [
+            "DUKE"
+          ],
+          "question": 3
+        },
+        {
+          "id": "a-information",
+          "title": "能不能把运气先剔掉，再谈奖金？",
+          "phase": "信息性原则",
+          "minutes": 4,
+          "body": "<p>回到维修店。假设整条街都在修路，附近各店的生意一起变差。只看你的师傅修了多少台，很难判断他有没有偷懒；若同时知道附近同行的表现，就多了一条线索。</p><p>这正是信息性原则要处理的问题：一项指标如果在已知原有产出的条件下，还能帮助判断隐藏行动，就可能改善合同。把同一个信息换个名字再报一次，没有这种好处。</p><p>用一个小模型算算。你的产出 $y=e+z+u$，同行指标 $p=z+v$。其中 $z$ 是共同景气，$u,v$ 是各自噪声，三者独立。同行指标不受你员工的努力影响。</p><p>用 $y-@lambda p$ 作为考核指数，员工多努力一点对指数的影响仍为 1；它的噪声方差却变成：</p><div class=\"math\">$$(1-@lambda)^2@sigma_z^2+@sigma_u^2+@lambda^2@sigma_v^2$$</div><p>对 $@lambda$ 求导，可以找到噪声最小的扣除权重：</p><div class=\"math\">$$@lambda^*=@frac{@sigma_z^2}{@sigma_z^2+@sigma_v^2}$$</div><p>同行自己的噪声越大，就越不能把它全部扣掉。若员工还能影响同行数据，或者收集指标本身很贵，也得重新算。实际讨论考核时，可以先问一句：这项数据到底帮我们分清了哪一种努力和哪一种运气？</p>",
+          "refs": [
+            "H79",
+            "H82"
+          ],
+          "quiz": [
+            {
+              "id": "a-info-q",
+              "prompt": "若共同冲击方差为 4，同业独有噪声方差为 4，最小方差指数中的 $@lambda^*$ 是多少？",
+              "options": [
+                "0",
+                "0.5",
+                "1",
+                "2"
+              ],
+              "answer": 1,
+              "explanation": "$@lambda^*=4/(4+4)=0.5$。同行也有噪声，完全扣除通常过度。"
+            }
+          ],
+          "question": 3
+        },
+        {
+          "id": "a-worked",
+          "title": "奖金算对了，为什么这份工作仍然不该签？",
+          "phase": "计算练习",
+          "minutes": 4,
+          "body": "<p>再做一组数，检查我们有没有把四问里的哪一问忘掉。设 $c=2,r=1,@sigma=1,u_0=0.1$。依次算奖金、努力、风险补偿和底薪。</p><details><summary>先算奖金和努力</summary><div class=\"math\">$$b^*=@frac13,@qquad e^*=@frac16$$</div></details><details><summary>再算努力成本和风险补偿</summary><div class=\"math\">$$C=@frac1{36},@qquad RP=@frac1{18}$$</div></details><details><summary>让员工刚好愿意接受</summary><div class=\"math\">$$a=@frac1{10}-@frac1{18}+@frac1{36}+@frac1{18}=@frac{23}{180}$$</div></details><details><summary>公司最后能剩多少</summary><div class=\"math\">$$@Pi=@frac16-@frac1{36}-@frac1{18}-@frac1{10}=-@frac1{60}$$</div></details><p>结果是负的。如果公司不雇佣的收益是零，它应该放弃这份交易。最优奖金的意思是“在这些线性合同里，这是最好的”；最好的方案仍然可能不值得做。</p><p>把员工外部机会改为 0，奖金和努力不变，公司利润变成 $1/12$。这也说明，合同怎么设计和是否值得交易，是相邻但不同的两个判断。</p>",
+          "refs": [
+            "STOLE"
+          ],
+          "quiz": [
+            {
+              "id": "a-work-n",
+              "prompt": "保留上述 $c,r,@sigma$，将 $u_0$ 改为 0，最优利润是多少？输入小数。",
+              "answer": 0.08333333333333333,
+              "tolerance": 0.001,
+              "explanation": "努力减努力成本减风险溢价：$1/6-1/36-1/18=1/12@approx0.0833$。",
+              "numeric": true
+            }
+          ],
+          "question": 3
+        },
+        {
+          "id": "a-check",
+          "title": "换个岗位，你还会不会这样算？",
+          "phase": "章末检验",
+          "minutes": 6,
+          "body": "<p>假设现在招的不是维修师傅，而是负责排查故障的工程师。修复数量能数清，故障难度却差得很大。你准备提高每单奖金。</p><p>先别急着给比例。要先知道：工程师实际能改变什么；哪些产出差异只是设备或故障条件不同；有什么数据能帮你区分两者。只有这些量说得清，奖金公式里的噪声才有现实含义。</p><p>下面三题分别检查平方、员工选择和合同限制。做完再回头看：自己是算错了数字，还是把某个条件忘掉了？</p>",
+          "refs": [
+            "H79",
+            "STOLE"
+          ],
+          "quiz": [
+            {
+              "id": "a-end1",
+              "prompt": "当 $r,c$ 不变，噪声标准差翻倍时，哪个说法正确？",
+              "options": [
+                "最优奖金必然减半",
+                "分母的风险项变为原来的四倍",
+                "风险项不变",
+                "努力必然翻倍"
+              ],
+              "answer": 1,
+              "explanation": "公式使用方差。若原来的风险项是 $rc@sigma^2$，现在是 $4rc@sigma^2$；奖金不是简单减半。"
+            },
+            {
+              "id": "a-end2",
+              "prompt": "为什么公司不能直接令 $e=e^{FB}$？",
+              "options": [
+                "员工没有理性",
+                "努力成本无法计算",
+                "努力不可契约，必须由合同诱导",
+                "第一最佳没有定义"
+              ],
+              "answer": 2,
+              "explanation": "公司受到 IC 约束；希望某种努力与员工愿意选择该努力是两件事。"
+            },
+            {
+              "id": "a-end3",
+              "prompt": "如果员工不得支付固定费用，算出 $a&lt;0$ 后应怎么做？",
+              "options": [
+                "直接忽略限制",
+                "仍宣布原合同最优",
+                "将 $a$ 改为 0，其他量自动不变",
+                "加上 $a@ge0$ 重新求解"
+              ],
+              "answer": 3,
+              "explanation": "不能只修补一个数值。固定工资约束可能改变 IR 是否绑定以及最优奖金。"
+            }
+          ],
+          "question": 3
+        },
+        {
+          "id": "a-takeaway",
+          "title": "再看那两份工资：为什么只选一头都不够？",
+          "phase": "提取与记忆",
+          "minutes": 3,
+          "body": "<p>开头的固定工资省去了收入风险，却没有在本模型中给出边际激励；全额提成让员工愿意做更多，又把全部产出波动交给了他。工资设计要在这两笔代价之间选位置。</p><div class=\"math\">$$e(b)=@frac bc,@qquad RP=@frac r2b^2@sigma^2,@qquad b^*=@frac1{1+rc@sigma^2}$$</div><p>记忆时把三条式子按因果顺序连起来：给出奖金，员工选努力；奖金越强，承担的收入风险越大；公司把两者一起算，才得到最后的奖金。只背最后一个分式，会看不见它是怎么来的。</p><p>使用时也按这个顺序：先写员工自己的账，再检查他愿不愿接受，最后算公司。若有最低工资、有限责任、努力改变风险或多项任务，不能把这些限制擦掉后继续用同一个答案。</p><p>下一章保留同一位员工，却给他加上一件难以计量的工作。到时你会发现，问题不只是他愿意多干多少，还有他会少干什么。</p>",
+          "refs": [
+            "STOLE",
+            "DUKE"
+          ],
+          "memory": {
+            "question": "单任务线性合同中，为什么最优奖金不是永远等于 1？",
+            "answer": "因为更强的奖金让风险厌恶的员工承担更大收入波动，公司必须补偿。CARA、正态、二次成本、单位价值和自由转移下，线性合同内 $b^*=1/(1+rc@sigma^2)$；员工努力 $e=b/c$。"
+          },
+          "question": 3
+        }
+      ],
+      "problem": "给多少提成，才能让这份工作值得做？",
+      "questions": [
+        {
+          "title": "做多少才划算？",
+          "start": "a-firstbest"
+        },
+        {
+          "title": "员工自己会怎么选？",
+          "start": "a-model"
+        },
+        {
+          "title": "他愿意接这份工资吗？",
+          "start": "a-risk-start"
+        },
+        {
+          "title": "公司该给多少？",
+          "start": "a-optimum"
+        }
+      ]
+    },
+    {
+      "id": "multitask",
+      "number": "02",
+      "title": "多任务：奖金改变努力的方向",
+      "short": "从考核指标到任务分配",
+      "duration": "40–60 分钟",
+      "pages": [
+        {
+          "id": "b-question",
+          "title": "结单数涨了，老板为什么还不满意？",
+          "phase": "完整工作与考核指标",
+          "minutes": 3,
+          "body": "<p>继续看那家维修店。老板按修好的机器数量发奖金，一个月后，结单数果然上升了。可顾客回来投诉，说有的机器没过几天又坏了。</p><p>先不要急着判断师傅是不是不负责任。假设他每一台都按流程修，只是把原来用于复检的时间拿去多接一单，数量就可能上升，可靠性却下降。工资奖励的方向和老板想要的完整工作，出现了差别。</p><p>第一章把努力压成了一个数。现在这个办法不够用了：同样忙一天，既可以多做复检，也可以多接新单。要回答的变成：<strong>给一件事加奖，会让另一件事少掉多少；这些变化加在一起，到底值不值？</strong></p><p>这章先只看时间怎么分，等这个问题弄清，再允许总努力增加。这样才能分辨，奖金到底是在让人多干活，还是让人换一种干法。</p>",
+          "refs": [
+            "HM91"
+          ],
+          "question": -1
+        },
+        {
+          "id": "b-map",
+          "title": "这一次，要拆开“努力”这个词",
+          "phase": "继续追问",
+          "minutes": 2,
+          "body": "<p>上一章问“他会多努力多少”，这一章必须把这句话拆开。按下面的顺序追问，会更容易看清问题。</p><ol class=\"question-tree\"><li><strong>老板究竟需要哪几件事？</strong><p>数量、复检、解释故障，先列全。再看工资实际奖励了其中哪些。</p></li><li><strong>这些事会互相挤占吗？</strong><p>如果只争夺同一小时，做这项就得少做那项；如果一个任务能帮助另一个，结果可能相反。</p></li><li><strong>这种联系如何改变最优奖金？</strong><p>不能逐个指标各算各的，因为对一个任务的奖励可能改变另一个任务。</p></li><li><strong>不改奖金，改岗位安排行不行？</strong><p>把两项任务交给两个人，也许能缓解挤占，却会多出交接和协调成本。</p></li></ol>",
+          "refs": [
+            "HM91",
+            "DUKE"
+          ],
+          "question": -1
+        },
+        {
+          "id": "b-numbers",
+          "title": "不用公式，先分这一个小时",
+          "phase": "继续追问",
+          "minutes": 3,
+          "body": "<p>设定一个很简单的工作日片段：接单处理和复检总共只有 60 分钟。没有数量奖金时，师傅愿意两边各用 30 分钟。现在老板只对数量加奖。</p><div class=\"table-wrap\"><table><thead><tr><th>分配方式</th><th>接单处理</th><th>复检</th><th>可以确定的事</th></tr></thead><tbody><tr><td>原来的分配</td><td>30 分钟</td><td>30 分钟</td><td>两项都有人做</td></tr><tr><td>向数量倾斜</td><td>48 分钟</td><td>12 分钟</td><td>总时间没变</td></tr><tr><td>完全追数量</td><td>60 分钟</td><td>0 分钟</td><td>复检被放弃</td></tr></tbody></table></div><p>如果只看结单数，第二种很可能更好看。但仅凭这张表，还不知道哪种对店里最好：数量和可靠性各值多少，还没有给出。</p><p>这张表先说明一件更基础的事：<strong>考核变好，不足以证明完整工作变好。</strong>我们得把没有进入指标的那一部分也放回账里。下面把这 60 分钟缩放成 1 单位时间，算奖金如何推动分配。</p>",
+          "refs": [
+            "HM91"
+          ],
+          "question": 0
+        },
+        {
+          "id": "b-attention",
+          "title": "奖金先改变的是这一小时往哪边挪",
+          "phase": "教学模型",
+          "minutes": 4,
+          "body": "<p>用 $t$ 表示用于数量任务的时间份额，剩下 $1-t$ 用于另一项任务。没有奖金时的偏好是 $t_0$；偏离这个分配的成本设成 $k(t-t_0)^2/2$。它可以表示职业偏好或改变既有工作节奏的不适，是这里为讲清机制加入的假设。</p><div class=\"math\">$$@max_{0@le t@le1}@;a+bt-@frac k2(t-t_0)^2$$</div><p>如果没有碰到 0 和 1 的边界，数量奖金多一点，就会把时间向数量任务推一点：</p><div class=\"math\">$$t^*=t_0+b/k@quad@text{（内点）}$$</div><p>算出超过 1，就只能停在 1；算出低于 0，就停在 0。也就是把答案截在一整天允许的范围内。默认的 $t_0=0.5,k=1$ 下，奖金 0.3 会把分配推到 0.8，正好对应上一页的 48 分钟和 12 分钟。</p><div data-lab=\"attention\"></div><p>假如公司同等重视两种时间，而且原分配已经合适，继续给数量加奖就没有收益，还会多付偏离成本。这个例子解释了为什么零数量奖金有时合理，但它靠的是“原本就愿意照顾两项任务”的设定。若没有这个动机，不能指望不给奖金就自动得到均衡工作。</p>",
+          "refs": [
+            "HM91"
+          ],
+          "question": 1
+        },
+        {
+          "id": "b-cross",
+          "title": "不固定时间，两项任务还会互相影响吗？",
+          "phase": "模型假设",
+          "minutes": 4,
+          "body": "<p>固定一小时把挤占讲得很清楚，却也限制得很死。师傅也许可以更专注，让两项工作都多做一点。要把这种可能性放进来，就把两项努力分别记为 $e_1,e_2$，不再强迫它们相加等于 1。</p><p>两件事是否抢同一种精力，可以放在成本里：</p><div class=\"math\">$$C(e_1,e_2)=@frac12(e_1^2+e_2^2+2@rho e_1e_2),@qquad |@rho|&lt;1$$</div><p>各自的平方表示越往上加越辛苦。中间的交叉项表示，另一项已经做了多少，会不会改变这一项再多做一点的难度。</p><div class=\"math\">$$C_1=e_1+@rho e_2,@qquad C_2=e_2+@rho e_1$$</div><p>当 $@rho&gt;0$，另一项做得越多，自己这一项的边际成本越高，两项在私人成本上替代；$@rho=0$ 则各算各的；$@rho&lt;0$ 则有互相帮助的效果。这里说的是人的成本关系，不是两个指标的统计相关。</p><details><summary>为什么限制 $|@rho|&lt;1$？</summary><p>成本矩阵的两个特征值为 $1+@rho$ 和 $1-@rho$。这个限制让二者都为正，成本严格凸，员工的目标严格凹，便于确定唯一最优反应。</p></details>",
+          "refs": [
+            "DUKE",
+            "HM91"
+          ],
+          "question": 1
+        },
+        {
+          "id": "b-response",
+          "title": "提高一项奖金，另一项会少多少？",
+          "phase": "核心推导",
+          "minutes": 5,
+          "body": "<p>两项任务各有奖金 $b_1,b_2$。员工对每项努力的选择，仍然遵守上一章的那笔边际账：多拿到的奖金等于多承担的成本。如果两项努力都大于零：</p><div class=\"math\">$$b_1=e_1+@rho e_2,@qquad b_2=e_2+@rho e_1$$</div><p>第一条减去 $@rho$ 倍的第二条，就消去一个未知数；另一项同样处理，得到：</p><div class=\"math\">$$e_1=@frac{b_1-@rho b_2}{1-@rho^2},@qquad e_2=@frac{b_2-@rho b_1}{1-@rho^2}$$</div><p>现在才可以准确地问“只提高数量奖金，对复检有什么影响”。对第一项奖金求导：</p><div class=\"math\">$$@frac{@partial e_2}{@partial b_1}=-@frac{@rho}{1-@rho^2}$$</div><p>若 $@rho=0.5$，第一项奖金每增加一小单位，第二项努力减少约 $2/3$ 单位。比如奖金从 $(0.8,0.6)$ 改成 $(1,0.6)$，第二项努力从 $4/15$ 降到 $2/15$。</p><p>若 $@rho=0$，这个影响消失；若 $@rho&lt;0$，另一项反而一起上升。到这里，“加奖会不会挤出”已经成了一个可以检查符号的问题。</p>",
+          "refs": [
+            "DUKE"
+          ],
+          "quiz": [
+            {
+              "id": "b-derivative",
+              "prompt": "若 $@rho=0.5$，内点的 $@partial e_2/@partial b_1$ 是多少？",
+              "answer": -0.6666666666666666,
+              "tolerance": 0.001,
+              "explanation": "$-0.5/(1-0.25)=-2/3$。这表示奖金增加一小单位时的局部变化率，不是任务 2 的努力水平。",
+              "numeric": true
+            }
+          ],
+          "question": 1
+        },
+        {
+          "id": "b-boundary",
+          "title": "算出了负努力，哪里出了问题？",
+          "phase": "约束与角点",
+          "minutes": 4,
+          "body": "<p>保持第二项奖金不变，一直提高第一项，前页公式可能给出负的第二项努力。这里设定的努力不能小于零，所以该换一种算法了。</p><p>对正奖金和 $0&lt;@rho&lt;1$，答案分成三段：</p><div class=\"math\">$$(e_1,e_2)=@begin{cases}(0,b_2),&b_1@le@rho b_2,@@(@frac{b_1-@rho b_2}{1-@rho^2},@frac{b_2-@rho b_1}{1-@rho^2}),&@rho b_2&lt;b_1&lt;b_2/@rho,@@(b_1,0),&b_1@ge b_2/@rho.@end{cases}$$</div><p>中间两项都做；左端只做第二项；右端只做第一项。第二项降到零后，不会继续往负数掉。此时先前的内点交叉导数也不再适用。</p><p>还有一个更容易忽略的问题：若第二项奖金一开始就是零，成本又相互替代，并且没有任何其他私人收益，员工本来就不会做第二项。这样一个模型不能解释“原来认真复检，后来被奖金挤走”。要讲这个过程，至少得说清最初是什么使他愿意复检。</p><details><summary>怎么检查零努力是否最优？</summary><p>在 $e_1=b_1,e_2=0$ 时，员工增加一点任务 2 的净收益是 $b_2-@rho b_1$。若不大于零，他就留在边界；若大于零，零努力不可能最优。</p></details>",
+          "refs": [
+            "DUKE"
+          ],
+          "quiz": [
+            {
+              "id": "b-corner",
+              "prompt": "若 $b_1=1.5,b_2=0.5,@rho=0.5$，应选哪组努力？",
+              "options": [
+                "$(1.667,-0.333)$",
+                "$(1.5,0)$",
+                "$(0,0.5)$",
+                "$(1,1)$"
+              ],
+              "answer": 1,
+              "explanation": "内点给出负的第二项而不可行。边界上 $e_1=b_1=1.5$，且 $b_2-@rho b_1=-0.25&lt;0$。"
+            }
+          ],
+          "question": 1
+        },
+        {
+          "id": "b-lab",
+          "title": "试着把一项工作挤到零，再把它救回来",
+          "phase": "参数实验",
+          "minutes": 5,
+          "body": "<p>先保留两项正奖金。把第一项奖金往上推，观察第二项什么时候降到零。然后只改任务关系，看看同一份工资会让人怎样重新分配努力。</p><div data-lab=\"multitask\"></div><p>默认 $@rho=0.5,b_2=0.6$，第二项会在 $b_1=1.2$ 处触及零。把 $@rho$ 改成 0，再增加第一项奖金，第二项就不再受它影响。若改成负数，两项努力会一起增加。</p><p>到这里我们只解出了员工怎么做。还没回答哪一组奖金对公司最好：努力增加要花成本，两个任务给公司的价值也未必相同。下一页把这张私人账接回公司账。</p>",
+          "refs": [
+            "DUKE"
+          ],
+          "question": 1
+        },
+        {
+          "id": "b-vector",
+          "title": "公司也得把两项工作放在一张账上",
+          "phase": "进阶推导",
+          "minutes": 6,
+          "body": "<p>假设数量和复检各有一个带噪声的指标，公司分别给予奖金。若逐项套用第一章，只会看到这一项自己的测量误差；但前面已经算出，一项奖金会改变两种努力，所以不能把它们完全拆开。</p><p>把各项努力、奖金写成向量 $e,b$。用矩阵 $H$ 存放成本联系，用 $@Sigma$ 存放信号的噪声方差和协方差，用 $v$ 存放公司对各项努力的价值。它们分别回答三个不同问题：做起来是否互相影响，测起来是否互相影响，以及公司到底看重什么。</p><div class=\"math\">$$C(e)=@frac12e^THe,@qquad w=a+b^Ty$$</div><p>内点的员工反应是 $e=H^{-1}b$。沿用第一章的 CARA、联合正态、线性工资与自由固定转移，公司最后的奖金公式是：</p><div class=\"math\">$$@boxed{b^*=(I+rH@Sigma)^{-1}v}$$</div><p>先不熟悉矩阵，也能读出它的意思：成本和测量联系都进了同一个答案。一项任务难测，可能影响另一项任务的合适奖金。</p><details><summary>要核对推导，再展开</summary><div class=\"math\">$$S(b)=v^TH^{-1}b-@frac12b^TH^{-1}b-@frac r2b^T@Sigma b$$</div><div class=\"math\">$$H^{-1}v-H^{-1}b-r@Sigma b=0$$</div><p>左乘 $H$，整理得到上式。若成本和噪声都独立，每项退化为 $b_i^*=v_i/(1+rH_{ii}@sigma_i^2)$。若解诱导了负努力或违反合同限制，需要重新处理约束。</p></details>",
+          "refs": [
+            "DUKE"
+          ],
+          "question": 2
+        },
+        {
+          "id": "b-weak",
+          "title": "有些岗位为什么不适合重绩效？",
+          "phase": "经典思想与边界",
+          "minutes": 4,
+          "body": "<p>回到店里。数量很好数，复检是否扎实，可能要过一阵子才知道。你给数量开了很强的奖金，却没办法对复检给出同样可靠的奖励，员工自然更愿意把精力放在能兑现收入的地方。</p><p>这就解释了一种乍看奇怪的选择：公司明明可以按数量发钱，却主动把奖金放弱。它放弃了一部分数量激励，以减少对难测任务的挤占。</p><p>但不能把这句话无限放大。如果员工对两项任务都没有其他动机，零奖金可能让两项努力一起归零。我们最初那个固定时间例子能选零奖金，是因为原有偏好已经照顾两项任务、公司也同样看重两项。</p><p>所以讨论一个岗位的工资前，得先知道没有显性奖金时，工作靠什么维持：职业偏好、晋升、监督、合作关系，还是别的机制。它们不同，适合的奖金也会不同。</p><p>比较稳妥的问法是：这次加奖准备换来什么，又最可能让他放下什么？如果后一项很重要却难以计量，前一项就不能单独决定方案。</p>",
+          "refs": [
+            "HM91",
+            "STOLE"
+          ],
+          "question": 2
+        },
+        {
+          "id": "b-design",
+          "title": "把复检交给另一个人，会不会更好？",
+          "phase": "组织设计",
+          "minutes": 4,
+          "body": "<p>如果同一个人总在赶数量和做复检之间纠结，最直接的办法是拆岗位。接单的人专门接单，复检的人专门复检。这样，数量奖金就不再直接抢占同一个人的复检时间。</p><p>不过工作没有凭空变便宜。两个人要交接，复检发现问题后要说清责任，还可能互相等。岗位拆分减少了个人内部的挤占，也增加了人与人之间的协调成本。</p><div class=\"table-wrap\"><table><thead><tr><th>可以试的办法</th><th>先解决什么</th><th>接着要算什么</th></tr></thead><tbody><tr><td>改善复检信号</td><td>让质量努力更容易被奖励</td><td>测量和审核费用</td></tr><tr><td>降低数量奖金</td><td>减少向易测任务倾斜</td><td>总努力下降的代价</td></tr><tr><td>分开岗位</td><td>减少同一人内部的争夺</td><td>交接与责任成本</td></tr><tr><td>设质量门槛</td><td>限制牺牲质量的做法</td><td>门槛能否核实、是否诱发应付</td></tr></tbody></table></div><p>这些办法并不互相排斥，也没有一个只凭名字就胜出。分析时应把员工将怎样换一种做法说出来，再把公司新增加的成本算进去。</p>",
+          "refs": [
+            "HM91"
+          ],
+          "question": 3
+        },
+        {
+          "id": "b-check",
+          "title": "看到质量下降，别马上认定是奖金害的",
+          "phase": "章末检验",
+          "minutes": 6,
+          "body": "<p>客服部门提高了通话数量奖金，之后满意度下降。有一种解释是员工缩短了每次解释的时间；也可能是新来的问题更难；还可能是满意度调查换了样本。三种情况看上去相似，需要改的东西却不一样。</p><p>第一种才直接对应本章的努力分配。后两种要先处理环境或测量。理论给了你一种机制，还需要数据告诉你，这次到底是不是它。</p><details><summary>用一小步计算核对交叉效应</summary><p>设 $b_1=b_2=1,@rho=0.5$，两项努力原本都是 $2/3$。把第一项奖金增加 0.15 后，第一项变为 $13/15$，第二项变为 $17/30$，后者减少 0.1。交叉导数预测 $(-2/3)@times0.15=-0.1$，正好一致。</p></details><p>下面的问题留意两个地方：有没有真的存在成本联系，以及算出的行为有没有越过可行边界。</p>",
+          "refs": [
+            "HM91",
+            "DUKE"
+          ],
+          "quiz": [
+            {
+              "id": "b-end1",
+              "prompt": "若两任务成本可分且噪声独立，提高任务 1 奖金是否必然降低任务 2 努力？",
+              "options": [
+                "必然降低",
+                "不必；本模型交叉效应为零",
+                "必然提高",
+                "模型无法求解"
+              ],
+              "answer": 1,
+              "explanation": "可分成本意味着 $@rho=0$。任务 2 的最优努力只取决于自己的奖金。"
+            },
+            {
+              "id": "b-end2",
+              "prompt": "内点公式给出负的质量努力，正确做法是什么？",
+              "options": [
+                "把负值解释为破坏行为",
+                "继续使用原斜率",
+                "检查非负约束并求角点",
+                "删除质量任务"
+              ],
+              "answer": 2,
+              "explanation": "负努力不在设定的可行集中。应使用边界最优条件，而不是事后编造行为解释。"
+            },
+            {
+              "id": "b-end3",
+              "prompt": "“难测任务重要，所以零绩效工资总是最佳”有什么问题？",
+              "options": [
+                "没有问题",
+                "遗漏任务关系、其他动机和总努力反应",
+                "只需要增加固定工资即可证明",
+                "只要任务重要就足够"
+              ],
+              "answer": 1,
+              "explanation": "弱激励的合理性有条件。如果没有其他动机，零奖金可能导致零努力。应把完整行为机制写入模型。"
+            }
+          ],
+          "question": 3
+        },
+        {
+          "id": "b-takeaway",
+          "title": "考核奖励了什么，又漏掉了什么？",
+          "phase": "提取与记忆",
+          "minutes": 3,
+          "body": "<p>这一章从“结单数涨了”开始，最后得到的不是一条反考核口号，而是一笔完整的任务账。只奖励某一项，可能使另一项被挤走，也可能借助互补关系把它带起来。</p><div class=\"math\">$$e=H^{-1}b,@qquad @frac{@partial e_2}{@partial b_1}=-@frac{@rho}{1-@rho^2}$$</div><p>用这条交叉导数记住三种可能：替代时为负，独立时为零，互补时为正。到了零努力或时间上限，要停下来改用边界条件。</p><p>实际要做的是把完整工作和考核指标并排写出来，再逐项检查：未被计量的工作靠什么获得回报，它与被奖励的任务是否争夺资源。之后才有依据讨论降低奖金、改进测量还是拆分岗位。</p><p>下一章再加一个麻烦：工作由几个人完成，结果却只能一起算。即使没有任务偏移，也可能有人没有充分理由多出那一点力。</p>",
+          "refs": [
+            "HM91",
+            "DUKE"
+          ],
+          "memory": {
+            "question": "什么条件下，提高任务 1 奖金会挤出任务 2 努力？",
+            "answer": "二次成本内点中，$@partial e_2/@partial b_1=-@rho/(1-@rho^2)$。私人边际成本替代 $@rho&gt;0$ 时为负；$@rho=0$ 时为零；互补时为正。碰到非负边界后须重新求解。"
+          },
+          "question": 3
+        }
+      ],
+      "problem": "提高一个指标，能让整份工作变好吗？",
+      "questions": [
+        {
+          "title": "这份工作到底包含什么？",
+          "start": "b-numbers"
+        },
+        {
+          "title": "奖金怎样改变任务分配？",
+          "start": "b-attention"
+        },
+        {
+          "title": "公司该怎样同时奖励？",
+          "start": "b-vector"
+        },
+        {
+          "title": "要改指标，还是改岗位？",
+          "start": "b-design"
+        }
+      ]
+    },
+    {
+      "id": "teams",
+      "number": "03",
+      "title": "团队：共同产出与个人激励",
+      "short": "分完所有收入，为什么仍有缺口",
+      "duration": "35–55 分钟",
+      "pages": [
+        {
+          "id": "c-question",
+          "title": "四个人都希望项目做好，为什么仍然会少出力？",
+          "phase": "提出问题",
+          "minutes": 3,
+          "body": "<p>维修店接到一个项目，需要四位师傅一起完成。客户最后只为整个项目验收，店里也很难核实每个人单独作了多少贡献。大家商量，收入四个人平分。</p><p>他们都希望项目成功，也没有谁打算故意把事情弄坏。但多复查一次、多处理一个麻烦问题，付出发生在自己身上，增加的收入却要和另外三个人分。</p><p>这次先把运气和任务方向都拿掉，只问一个更干净的问题：<strong>自己承担全部辛苦，只拿到四分之一好处，个人会不会愿意做到对全组最合适的程度？</strong></p><p>如果答案是否定的，换一种分成会不会解决？再大胆一点，有没有一种分钱规则，既把收入全部分给大家，又能让每个人都愿意做到最合适？这就是本章要追到底的问题。</p>",
+          "refs": [
+            "H82",
+            "STOLE"
+          ],
+          "question": -1
+        },
+        {
+          "id": "c-map",
+          "title": "先分清“他愿意做”与“大家值得做”",
+          "phase": "继续追问",
+          "minutes": 2,
+          "body": "<p>讨论团队效率时，很容易一句话就跳到“有人搭便车”。这里先不贴标签，把三步账算完。</p><ol class=\"question-tree\"><li><strong>对全组来说，多做一点值不值？</strong><p>增加的全部产出减增加的个人成本，先找出总收益最高的做法。</p></li><li><strong>对作决定的那个人来说，值不值？</strong><p>他的收入只增加其中一份，却要付全部成本。看看两张账差在哪里。</p></li><li><strong>能否靠改分成把差补上？</strong><p>先试固定比例，再允许更一般的支付规则。如果仍然不行，就找出卡住它的约束。</p></li></ol><p>算清最后一步，才知道应改监督、改预算、改合作关系，还是只改分钱比例。</p>",
+          "refs": [
+            "H82"
+          ],
+          "question": -1
+        },
+        {
+          "id": "c-numbers",
+          "title": "多做这一步，团队赚了，他却亏了",
+          "phase": "继续追问",
+          "minutes": 3,
+          "body": "<p>假设一位成员再花一点力气，可以让项目收入增加 20，个人为此付出的成本折合 8。收入由四个人平分。</p><div class=\"table-wrap\"><table><thead><tr><th>看谁的账</th><th>得到的新增收入</th><th>承担的新增成本</th><th>这一小步的净变化</th></tr></thead><tbody><tr><td>整个团队</td><td>20</td><td>8</td><td>增加 12</td></tr><tr><td>实际出力的人</td><td>5</td><td>8</td><td>减少 3</td></tr></tbody></table></div><p>全组值得做，个人却不值得做。你不需要假定他看不懂团队的利益：正因为他看得清楚，才知道自己额外付出以后，15 的好处会落到另外三个人手里。</p><p>如果四个人都面对同样的选择，每个人都可能少做那一步。我们下一步把这种“少做一点”的判断写成连续努力，就能精确比较团队的最好结果与个人选择凑成的结果。</p>",
+          "refs": [
+            "H82"
+          ],
+          "question": 0
+        },
+        {
+          "id": "c-model",
+          "title": "只看共同结果，先试最普通的分成",
+          "phase": "模型假设",
+          "minutes": 3,
+          "body": "<p>设有 $n$ 名成员，各自选择努力 $e_i@ge0$，共同产出是所有努力之和。每个人的成本都是 $ce_i^2/2$，单位产出价值仍为 1。</p><div class=\"math\">$$Q=@sum_i e_i,@qquad C_i=@frac c2e_i^2$$</div><p>把产出按固定比例分掉，成员 $i$ 的比例为 $s_i$，所有比例加起来等于 1。他自己的净收益是：</p><div class=\"math\">$$u_i=s_iQ-@frac c2e_i^2,@qquad s_i@ge0,@quad @sum_i s_i=1$$</div><p>大家同时决定努力，不能签一个可以强制执行的个人努力协议；没有能核实的个人产出，也先不考虑以后的合作。产出没有噪声，所以接下来出现的损失，不能归因于运气不好或风险补偿。</p><p>这个设定刻意很窄。它的好处是，把“共同产出的好处分散，努力成本落在个人”这一个原因单独拿出来了。</p>",
+          "refs": [
+            "H82"
+          ],
+          "question": 1
+        },
+        {
+          "id": "c-benchmark",
+          "title": "先算全组愿意看到的努力",
+          "phase": "第一最佳",
+          "minutes": 3,
+          "body": "<p>如果能直接协调所有人的努力，应该让产出扣掉全体成本后最多。</p><div class=\"math\">$$@max W=@sum_i e_i-@sum_i@frac c2e_i^2$$</div><p>对任何一个成员，多一单位努力都为全组增加 1 单位产出。做到边际成本也等于 1，就没有必要再增加：</p><div class=\"math\">$$1-ce_i=0@quad@Rightarrow@quad e_i^{FB}=1/c$$</div><div class=\"math\">$$Q^{FB}=n/c,@qquad W^{FB}=n/(2c)$$</div><p>例如四个人、$c=1$，每人努力 1，产出 4，成本合计 2，净剩余 2。它仍然只是第一最佳基准：说明全组做多少最合算，尚未说明每个人为什么愿意那样做。</p><p>接下来把选择权交回每个人手里，看看同样一组成本，能否得到同样的答案。</p>",
+          "refs": [
+            "H82",
+            "STOLE"
+          ],
+          "question": 1
+        },
+        {
+          "id": "c-nash",
+          "title": "把选择权交回个人，答案就变了",
+          "phase": "纳什均衡",
+          "minutes": 4,
+          "body": "<p>对成员 $i$ 来说，别人的努力暂时给定。他只要判断，自己再多做一点能多拿多少。按比例分成时，这个新增收入是 $s_i$，不是 1。</p><div class=\"math\">$$s_i-ce_i=0@quad@Rightarrow@quad e_i^{NE}=s_i/c$$</div><p>在这里，每个人的最优反应都不依赖别人的努力，所以把这些选择放在一起，就得到一个纳什均衡，NE。它的意思是：给定别人都这么做，任何一个人单独改努力都不会更好。</p><p>若收入等分，每人拿 $1/n$，于是：</p><div class=\"math\">$$e_i^{NE}=@frac1{nc},@qquad e_i^{FB}=@frac1c$$</div><p>四人团队里，每人只做到第一最佳的四分之一。这个结果是各自最优选择凑出来的，并没有人负责把额外努力给同伴的好处算进自己的账。</p><p>再看总产出。只要所有固定份额加总为 1，$@sum_i e_i=1/c$。在这个同成本、加总技术例子里，改比例能改变谁做得多，却不能靠这一步提高总努力。</p>",
+          "refs": [
+            "H82"
+          ],
+          "quiz": [
+            {
+              "id": "c-nash-n",
+              "prompt": "若 $n=5,c=2$ 且收入等分，每人的均衡努力是多少？",
+              "answer": 0.1,
+              "tolerance": 0.001,
+              "explanation": "$e_i=1/(nc)=1/10=0.1$；第一最佳为 $1/c=0.5$。",
+              "numeric": true
+            }
+          ],
+          "question": 1
+        },
+        {
+          "id": "c-lab",
+          "title": "人多了，究竟哪个量变差了？",
+          "phase": "参数实验",
+          "minutes": 5,
+          "body": "<p>先比较 2 人和 8 人。每人努力会下降，但总产出并不下降。不要把这两个量叫同一个“团队表现”。</p><div data-lab=\"team\"></div><p>总产出固定在 $1/c$，更多人分摊同样的努力，总成本却下降了：均衡总成本为 $1/(2nc)$，所以净剩余是 $1/c-1/(2nc)$，反而略有增加。</p><p>与此同时，第一最佳净剩余是 $n/(2c)$，随人数增加得更快。因此，均衡离基准的相对差距扩大了。几个不同的量可以同时向不同方向走。</p><p>现实团队还会发生分工、互补和协调负担，这里都没放进来。所以这张图可以帮你理解一个激励机制，不能单凭它决定公司的最佳人数。</p>",
+          "refs": [
+            "H82"
+          ],
+          "question": 1
+        },
+        {
+          "id": "c-general",
+          "title": "如果不按比例分，还能不能把事情办好？",
+          "phase": "从例子到命题",
+          "minutes": 4,
+          "body": "<p>到这里，我们只试了固定比例。它失败，不足以说明所有方案都失败。下一步允许支付随产出弯曲：低产出怎样给、高产出怎样给，都可以设计。</p><p>把成员 $i$ 的支付记为 $T_i(Q)$。只保留一条限制：每一种产出下，钱都恰好分完。</p><div class=\"math\">$$@sum_i T_i(Q)=Q$$</div><p>这叫逐状态预算平衡。注意“每一种产出下”：不是平均下来不亏钱，而是任何一次都不能外部补钱，也不能留住一部分不给大家。</p><p>我们接着问，在这些支付规则中，有没有一种能让所有成员都愿意选择第一最佳努力？下面用光滑支付函数给一个证明。它还要求连续努力、内点、正的边际产出、可分凸成本、风险中性和一次性非合作选择。</p><p>条件说清楚，才能看懂证明卡在哪里，也才能知道怎样改条件才有希望。</p>",
+          "refs": [
+            "H82",
+            "BORDER"
+          ],
+          "question": 2
+        },
+        {
+          "id": "c-proof",
+          "title": "每人都需要最后一单位收益，可它只能分一次",
+          "phase": "核心证明",
+          "minutes": 5,
+          "body": "<p>先写全组最优的条件。一般共同产出为 $Q(e)$，成员 $i$ 多一点努力的边际产出为 $Q_i&gt;0$：</p><div class=\"math\">$$Q_i=C_i^{@prime}(e_i)$$</div><p>再写这个成员自己的选择。他增加努力后，产出增加 $Q_i$，其中能转成自己收入的比例由支付斜率 $T_i^{@prime}(Q)$ 决定：</p><div class=\"math\">$$T_i^{@prime}(Q)Q_i=C_i^{@prime}(e_i)$$</div><p>若两条都在第一最佳成立，就要求每个成员的 $T_i^{@prime}=1$：他得拿到自己增加的全部边际产出，才愿意承担相应全部边际成本。</p><p>可是把逐状态预算平衡对产出求导，却得到：</p><div class=\"math\">$$@sum_i T_i^{@prime}(Q)=1$$</div><p>多人时，不能每个人的斜率都是 1，加起来却仍然只有 1。矛盾出现了。它说明上述条件下，光滑、只依赖共同产出且逐状态分完收入的支付规则，无法实施这个内点第一最佳。</p><p>如果给所有人再加一笔固定工资，支付斜率并不改变，因此这一步也修不好矛盾。要解这个问题，得改动证明里真正起作用的条件。</p>",
+          "refs": [
+            "H82",
+            "BORDER"
+          ],
+          "quiz": [
+            {
+              "id": "c-proof-q",
+              "prompt": "上述矛盾最直接来自哪两件事？",
+              "options": [
+                "每人要全部边际收益，而全部边际收益只能分一次",
+                "团队成员都厌恶风险",
+                "公司看不到总产出",
+                "努力必须离散"
+              ],
+              "answer": 0,
+              "explanation": "第一最佳要求每个有效成员的边际支付斜率为 1，逐状态预算平衡却要求这些斜率相加为 1。"
+            }
+          ],
+          "question": 2
+        },
+        {
+          "id": "c-principal",
+          "title": "留一部分钱不分，为什么反而可能帮上忙？",
+          "phase": "放松条件",
+          "minutes": 4,
+          "body": "<p>听起来奇怪：大家本来就觉得分得少，还引进一个人拿走部分收入，怎么可能改善激励？关键要看他拿走的钱怎样随结果变化。</p><p>如果这个外部主体能承诺，项目没达到某种要求时扣住部分产出，达标时按另一套规则支付，成员的收入就不必在每一种结果下恰好分完全部产出。之前那个“所有斜率加起来只能是 1”的限制被放松了。</p><p>在确定性模型中，可以用达标奖励、未达标扣留的方案，使目标努力成为一个纳什均衡。但有一个有效均衡，不代表只有这一个均衡；大家若预期别人不会努力，仍可能走到另一个低努力结果。</p><p>而且执行者必须真的能承诺。项目有噪声时，没达标也可能只是运气差，处罚又带来误罚和风险。这些问题不会因多了一个角色就自行消失。</p><p>因此这里说明的是外部预算执行者可能发挥的一种作用：改变成员面对的支付条件。它尚不足以证明任何现实中的管理者都创造了同样的价值。</p>",
+          "refs": [
+            "H82",
+            "STOLE"
+          ],
+          "question": 3
+        },
+        {
+          "id": "c-remedies",
+          "title": "要改制度，先说改掉了证明里的哪一条",
+          "phase": "迁移应用",
+          "minutes": 4,
+          "body": "<p>还有几条路。能核实个人贡献，就不必只根据共同产出付钱；成员可以有效监督和执行奖惩，个人行动就多了一种约束；长期合作足够重要，今天少出力可能损失未来收入。</p><div class=\"table-wrap\"><table><thead><tr><th>想改的安排</th><th>原来哪条限制变了</th><th>还得回答什么</th></tr></thead><tbody><tr><td>记录可核实个人绩效</td><td>只能按共同结果支付</td><td>记录是否失真、会不会追指标</td></tr><tr><td>可信的监督与奖惩</td><td>个人行动缺少约束</td><td>监督者自己有什么动机</td></tr><tr><td>持续合作</td><td>只有一次交易</td><td>未来是否足够重要、惩罚能否执行</td></tr><tr><td>外部预算主体</td><td>每种产出都分完</td><td>能否承诺、谁监督他</td></tr></tbody></table></div><p>去掉一条定理条件，只说明原证明不能直接用了，不能据此宣布新安排有效。还得再算新安排下每个人会怎么做。</p><p>比如给研发团队增加过程记录，也许能看清贡献，也可能让大家追记录数量而减少难以留痕的研究。第三章的问题刚缓解，第二章的问题又进来了。组织设计常常需要同时算几张账。</p>",
+          "refs": [
+            "H82",
+            "STOLE",
+            "HM91"
+          ],
+          "question": 3
+        },
+        {
+          "id": "c-check",
+          "title": "九一分成，至少能让一个人更努力，对吗？",
+          "phase": "章末检验",
+          "minutes": 6,
+          "body": "<p>对，但“一个人更努力”和“全组更有效率”仍然是两句话。设两人成本相同、产出相加，把五五改成九一后，一人的努力上升，另一人的下降。</p><details><summary>把两种分成的账都算一遍</summary><p>等分时努力为 $(0.5/c,0.5/c)$，总产出 $1/c$，成本合计 $0.25/c$。九一时努力为 $(0.9/c,0.1/c)$，总产出仍为 $1/c$，成本却变成 $0.41/c$。同样的产出集中到一人身上，凸成本更高。</p></details><p>所以在本章这个同质成员、固定份额的例子里，等分比九一有更高净剩余，虽然它也达不到第一最佳。不能只盯着受激励最多的那个人。</p><p>最后检查：一个分成方案失败，是不是已经证明所有方案不行？额外发固定工资，改掉了支付的哪一部分？下面三题正好对应这两个容易跳步的地方。</p>",
+          "refs": [
+            "H82",
+            "BORDER"
+          ],
+          "quiz": [
+            {
+              "id": "c-end-n",
+              "prompt": "两人团队 $c=1$，分成 $(0.9,0.1)$ 时的总努力成本是多少？",
+              "answer": 0.41,
+              "tolerance": 0.001,
+              "explanation": "两人的努力分别为 0.9 和 0.1。成本为 $(0.9^2+0.1^2)/2=0.41$。",
+              "numeric": true
+            },
+            {
+              "id": "c-end-q1",
+              "prompt": "只证明等分收入不能实施第一最佳，是否足以证明所有支付规则都不行？",
+              "options": [
+                "足以",
+                "不足；还需分析更一般分享规则",
+                "如果人数超过 3 就足以",
+                "只要成员风险中性就足以"
+              ],
+              "answer": 1,
+              "explanation": "一个方案失败不是不可能性证明。需要把所有允许的支付规则共同受到的限制写出来。"
+            },
+            {
+              "id": "c-end-q2",
+              "prompt": "用额外的固定工资补偿成员，能否直接解决两行证明中的边际矛盾？",
+              "options": [
+                "能，因为收入提高",
+                "不能，固定转移不改变边际斜率",
+                "必然能，若工资足够高",
+                "只有人数为 2 时能"
+              ],
+              "answer": 1,
+              "explanation": "在本章准线性效用下，固定工资不会改变个人多做一点努力的回报。"
+            }
+          ],
+          "question": 3
+        },
+        {
+          "id": "c-takeaway",
+          "title": "团队的账，为什么进不了每个人的账？",
+          "phase": "提取与记忆",
+          "minutes": 3,
+          "body": "<p>开头那一步给团队多赚 20、自己却只多拿 5 的工作，就是整章的缩影。成员承担全部边际成本，只拿一部分边际收入，于是会在全组觉得该停下来之前先停下来。</p><div class=\"math\">$$e_i^{NE}=s_i/c,@qquad e_i^{FB}=1/c$$</div><p>一般支付的证明把同一个问题推到了边际斜率上：实施第一最佳要求每个有效成员拿全部边际产出，逐状态预算平衡却只容许把它分一次。</p><div class=\"math\">$$T_i^{@prime}=1@;@text{ 对每人},@qquad @sum_iT_i^{@prime}=1$$</div><p>以后遇到“团队没人主动补位”，可以先问：补位产生的好处归谁，代价归谁；个人贡献能否核实；有没有可信预算或未来关系。这个问题比直接把所有人归为懒惰，更容易推到可检查的制度上。</p><p>下一章的额外投入发生得更早：钱和力气已经花了，等到分钱时才开始谈。那就要考虑，谁能控制资产，会不会改变今天愿意投入多少。</p>",
+          "refs": [
+            "H82",
+            "BORDER"
+          ],
+          "memory": {
+            "question": "为什么逐状态预算平衡可能与团队第一最佳激励冲突？",
+            "answer": "光滑支付规则下，第一最佳与个人 IC 要求每个有效成员的边际支付 $T_i^{@prime}(Q)=1$；逐状态预算平衡要求所有边际支付加总为 1。$n&gt;1$ 时矛盾。结论有明确的连续、内点、共同产出等条件。"
+          },
+          "question": 3
+        }
+      ],
+      "problem": "只能看到共同成果，怎样让个人愿意多出力？",
+      "questions": [
+        {
+          "title": "全组和个人的账差在哪？",
+          "start": "c-numbers"
+        },
+        {
+          "title": "各自选择会得到什么结果？",
+          "start": "c-model"
+        },
+        {
+          "title": "能靠改分钱规则解决吗？",
+          "start": "c-general"
+        },
+        {
+          "title": "还有哪些条件可以改？",
+          "start": "c-principal"
+        }
+      ]
+    },
+    {
+      "id": "ownership",
+      "number": "04",
+      "title": "产权：控制权为什么影响投资",
+      "short": "事后议价与事前投入",
+      "duration": "40–60 分钟",
+      "pages": [
+        {
+          "id": "d-question",
+          "title": "把供应商买下来，就能让他好好合作吗？",
+          "phase": "企业为什么不能一直买买买",
+          "minutes": 3,
+          "body": "<p>维修店越做越大，开始跟一家加工厂合作，定做专用零件。双方都得先花时间：你要修改设备方案，对方要培训工人、适应工艺。等投入做完，双方再谈这批订单怎么分收益。</p><p>问题来了。工艺一旦专门为你改好，加工厂就没那么容易转去做别人的生意。你也一样：设备已经按它的零件改过，再换供应商很麻烦。双方都知道对方不容易离开，谈价就可能变得难受。</p><p>一个直觉是：那就把加工厂买下来，变成一家。可厂房和机器买得下来，原来负责人愿不愿继续费心，熟练工愿不愿继续投入，未必因此有了保证。</p><p>所以这一章的总问题是：<strong>有些关键投入无法提前写进可执行合同，资产归谁，怎样才能让双方今天更愿意投入？</strong>要回答它，需要先看明天谈判时各自还能做什么。</p>",
+          "refs": [
+            "GH86",
+            "HART"
+          ],
+          "question": -1
+        },
+        {
+          "id": "d-map",
+          "title": "先投入，后分钱：这条时间线不能看反",
+          "phase": "继续追问",
+          "minutes": 2,
+          "body": "<p>如果只看最后谁拿的钱多，产权的作用很容易被讲成“谁强势谁多拿”。我们要解释的却是更早的选择：想到以后会怎样分钱，今天还愿不愿意花那笔投入。</p><ol class=\"question-tree\"><li><strong>为什么不能现在就写好？</strong><p>先找出哪项质量、适配或努力难以由第三方核实，不能直接按它执行付款。</p></li><li><strong>等投入做完，双方怎样谈？</strong><p>需要知道合作能创造多少，以及谈不成时各自还能得到多少。</p></li><li><strong>预见这个分法，今天会投多少？</strong><p>投资人承担全部成本，却可能只能拿到一部分新增收益。</p></li><li><strong>资产交给谁，能改善多少？</strong><p>产权改变退出合作时的用途，再通过谈判回报改变投入。两边的变化都要算。</p></li></ol>",
+          "refs": [
+            "GH86",
+            "HART"
+          ],
+          "question": -1
+        },
+        {
+          "id": "d-trap",
+          "title": "一个本来能多赚 40 的改进，为什么没人做？",
+          "phase": "继续追问",
+          "minutes": 3,
+          "body": "<p>先不谈所有权，只看一项改进。假设它花费 60，能让合作产生的价值增加 100。双方知道改进有用，却无法事前把这项不可核实的改进写进可执行的支付条款；投入完成后，新增收入要再协商。</p><p>若届时新增 100 被平分，作改进的人只能多拿 50，却自己支付了 60。早知道如此，他就不会投。对双方合起来而言，这项改进本来能多创造 40 净收益。</p><p>这里甚至不必有人毁约，也不必最后谈崩。<strong>事后双方顺利合作、各分一半，仍然可能让事前那笔值得做的投入消失。</strong></p><p>你也许会问，为什么不先保证给他 60？如果能核实并按投入执行偿付，那当然是一条路。本章研究的正是某些关键投入难以这样约定的情形。接下来先把“知道它发生”和“能按它执行合同”的区别说清楚。</p>",
+          "refs": [
+            "GH86",
+            "PRINCETON"
+          ],
+          "question": -1
+        },
+        {
+          "id": "d-contract",
+          "title": "你我都知道，不代表第三方能按它判",
+          "phase": "概念与假设",
+          "minutes": 4,
+          "body": "<p>两家公司可能都知道一次工艺适配有没有用，却很难向第三方证明：究竟改善了多少，哪些收益由它带来，应该按哪一条付款。彼此可观察，和可以验证并强制执行，是两回事。</p><p>这不是只靠多写几页就必然解决的问题。若某些重要用途没有办法具体约定，事情真的发生时，总得有人有权决定机器如何使用。</p><p>产权理论把这种对非人力资产未约定用途的决定权称为剩余控制权。你买下设备，可以在合同和法律允许的范围内决定它怎样用；却不能因此拥有工人的技能，或强迫别人愿意为你投入。</p><p>本章把“某些投入不能事前契约化”作为限制，研究在它存在时如何安排资产。我们不在这里证明所有复杂机制都无法克服这个限制。对不完全契约理论的批评，也有一部分正是围绕这点展开。</p><p>现在有了需要分配的东西：资产在未约定情形下的控制权。接下来还得弄清，它究竟怎样进入双方的收入，才知道为什么会影响投资。</p>",
+          "refs": [
+            "HART",
+            "AH11",
+            "MITBOUND"
+          ],
+          "question": 0
+        },
+        {
+          "id": "d-timing",
+          "title": "先解明天怎么分，再回头算今天投多少",
+          "phase": "模型时序",
+          "minutes": 4,
+          "body": "<p>把合作按时间排开：先决定资产归谁及固定转移；双方再分别投入；最后观察合作价值，谈判并交易。解题时反过来，先解最后一步，再把它带回投资选择。</p><p>让买方投入 $i$，卖方投入 $j$，各自成本是 $i^2/2$ 和 $j^2/2$。这可以理解为各自花在适配和技能上的投入。合作总价值先选一个容易手算的函数：</p><div class=\"math\">$$V(i,j)=Ai+Bj,@qquad A,B&gt;0$$</div><p>大写 $A,B$ 表示两种投入有多有效；买卖双方的下标则用 B 和 S。这里资产归谁不改变合作技术，只改变谈不成时能做什么。这是为单独看清产权渠道而作的简化。</p><p>双方都风险中性，收益可以用货币转移，没有财富约束。事前那笔固定支付不会随投入变化。成本一旦花出就收不回来，双方都预见后面的对称 Nash 议价。</p><p>还缺的一块是：谈判要从什么起点分收益？这就轮到不合作收益了。</p>",
+          "refs": [
+            "GH86",
+            "PRINCETON"
+          ],
+          "question": 1
+        },
+        {
+          "id": "d-nash",
+          "title": "不是把总收入对半分，而是分超过退路的那部分",
+          "phase": "数学补充",
+          "minutes": 5,
+          "body": "<p>先用数字。一起做这笔生意能得到 10；不合作时买方可以另赚 4，卖方可以另赚 2。合作真正多创造的是 4。对称地分这新增的 4，买方得 6，卖方得 4。</p><p>把这个算法写下来。合作价值记为 $V$，谈不成时的收益记为 $d_B,d_S$。对称 Nash 议价平分合作带来的增量：</p><div class=\"math\">$$@pi_B=d_B+@frac12(V-d_B-d_S),@qquad @pi_S=d_S+@frac12(V-d_B-d_S)$$</div><p>所以不合作时能保留的收益很重要。即使总合作价值没变，退路不同，最后分法也可能不同。这里要求合作增量非负，而且把 $d_B,d_S$ 当作 Nash 议价的不合作点；其他谈判协议不能直接混用。</p><details><summary>为什么对称 Nash 议价得到这个分法？</summary><p>在 $@pi_B+@pi_S=V$ 下最大化双方合作增益的乘积 $(@pi_B-d_B)(@pi_S-d_S)$。代入卖方收入，再对买方收入求导，得到 $V-2@pi_B+d_B-d_S=0$，就有上面的结果。</p></details><p>这些收入还没有扣事前投入成本。谈判时，投入已经沉没；回头决定投不投时，成本必须重新减掉。下一步看产权怎样改变这两条退路。</p>",
+          "refs": [
+            "PRINCETON"
+          ],
+          "quiz": [
+            {
+              "id": "d-nash-n",
+              "prompt": "若 $V=12,d_B=4,d_S=2$，对称 Nash 议价下买方收入是多少？",
+              "answer": 7,
+              "tolerance": 0.001,
+              "explanation": "合作增量为 $12-4-2=6$，买方收入为 $4+6/2=7$，尚未扣投资成本。",
+              "numeric": true
+            }
+          ],
+          "question": 1
+        },
+        {
+          "id": "d-threat",
+          "title": "机器归你，谈不成时你还能保留什么？",
+          "phase": "教学模型",
+          "minutes": 4,
+          "body": "<p>假设拥有资产的一方，在合作破裂时仍能利用自身投入的一部分；没有资产的一方，其专门适配的投入离开资产就发挥不了价值。这个差别是本章让产权起作用的渠道。</p><p>用 $@theta$ 表示所有者能保留的自身贡献比例，范围是 0 到 1。我们分别比较：</p><div class=\"table-wrap\"><table><thead><tr><th>所有者</th><th>买方不合作收益</th><th>卖方不合作收益</th></tr></thead><tbody><tr><td>买方</td><td>$d_B=@theta Ai$</td><td>$d_S=0$</td></tr><tr><td>卖方</td><td>$d_B=0$</td><td>$d_S=@theta Bj$</td></tr></tbody></table></div><p>比如买方拥有设备，它做的适配在谈不成时还可以留用一些；若设备由卖方控制，买方那部分专用投入就没有这里设定的退路。</p><p>$@theta$ 不是谈判权重。双方仍然各拿新增合作剩余的一半。产权先改变不合作时能拿什么，随后才通过上页的分配式改变收入。</p><p>现实资产可能同时影响双方多种用途，合作技术也可能变化。这里保留的是一个可以手算的特例，不是给所有企业边界作通用描述。</p>",
+          "refs": [
+            "GH86",
+            "HART",
+            "PRINCETON"
+          ],
+          "question": 1
+        },
+        {
+          "id": "d-invest",
+          "title": "预见这个分法，今天还愿意投入多少？",
+          "phase": "核心推导",
+          "minutes": 5,
+          "body": "<p>先让买方拥有资产。将它的不合作收益代回议价式，买方收入中和自己投资有关的部分是 $(1+@theta)Ai/2$；再减自己的成本：</p><div class=\"math\">$$u_B=@frac{1+@theta}{2}Ai+@frac12Bj-@frac12i^2$$</div><p>买方增加一点投入，拿到的新增回报是 $(1+@theta)A/2$，成本是 $i$。令二者相等；卖方同样计算：</p><div class=\"math\">$$i_B^*=@frac{1+@theta}{2}A,@qquad j_B^*=@frac B2$$</div><p>若改由卖方拥有资产，则变为：</p><div class=\"math\">$$i_S^*=@frac A2,@qquad j_S^*=@frac{1+@theta}{2}B$$</div><p>第一最佳是 $i^{FB}=A,j^{FB}=B$。无所有权的一方只拿到自身投入创造价值的一半，投入因此只有基准的一半。所有者的激励好一些，但 $@theta&lt;1$ 时也没有完全补上。</p><p>因此，“买下来”在这里改变了双方投入的方向和程度，尚未把问题一笔勾销。真正要比较的是，哪边改善得更多，哪边损失得更多。</p>",
+          "refs": [
+            "GH86",
+            "PRINCETON"
+          ],
+          "quiz": [
+            {
+              "id": "d-invest-n",
+              "prompt": "若 $A=2,B=1,@theta=0.6$ 且买方拥有，买方投资是多少？",
+              "answer": 1.6,
+              "tolerance": 0.001,
+              "explanation": "$i_B^*=A(1+@theta)/2=2@times1.6/2=1.6$。卖方投资为 0.5。",
+              "numeric": true
+            }
+          ],
+          "question": 2
+        },
+        {
+          "id": "d-surplus",
+          "title": "判断资产归谁，别只看哪一方收入上涨",
+          "phase": "制度比较",
+          "minutes": 5,
+          "body": "<p>产权转移后，所有者通常更愿意投入，另一方却可能退一些。若只看收购方的账，容易漏掉后面那一半。要比较两种安排，就把双方收入加起来，减去真实投入成本：</p><div class=\"math\">$$W=Ai+Bj-@frac12(i^2+j^2)$$</div><p>代入两种产权下的投资，买方拥有和卖方拥有的净剩余差为：</p><div class=\"math\">$$W_B-W_S=@frac{@theta(2-@theta)}8(A^2-B^2)$$</div><p>这组函数下，如果买方投入的生产率 $A$ 更高，把资产给买方更有利。理由是产权改善较高生产率那一项投入，带来的收益更大。若两边生产率相同，两种所有权总剩余相同，投入分配却互换。</p><details><summary>想自己把差值推出来</summary><p>生产率为 $x$ 时，无所有权的投入为 $x/2$，净贡献为 $3x^2/8$；有所有权的投入为 $(1+@theta)x/2$，净贡献为 $(3+2@theta-@theta^2)x^2/8$。改善幅度为 $@theta(2-@theta)x^2/8$，两项相减即可。</p></details><p>这不意味着谁投入更多就永远该拥有资产。改变成本、资产互补、外部用途或可契约程度，比较的答案也可能变。用的是这个机制，不是把特例中的一句结论贴到所有公司身上。</p>",
+          "refs": [
+            "GH86",
+            "AH11"
+          ],
+          "question": 3
+        },
+        {
+          "id": "d-lab",
+          "title": "把资产换个主人，看看两边谁多投、谁少投",
+          "phase": "参数实验",
+          "minutes": 5,
+          "body": "<p>默认参数里，买方投入更有效。先比较买方拥有与卖方拥有，再把两边生产率对调。每次都看双方投入和总剩余，不只看所有者的收入。</p><div data-lab=\"ownership\"></div><p>在 $A=2,B=1,@theta=0.6$ 时，买方拥有让双方投入分别为 1.6 和 0.5，净剩余 2.295；卖方拥有则为 1 和 0.8，净剩余 1.98。前者多 0.315，仍低于第一最佳的 2.5。</p><p>再把 $@theta$ 降到 0。两种产权不再改变任何投资，因为资产所有权已经不改变这里的退路。</p><p>实验没有加入收购费用中的真实交易成本、融资约束或技术协同；资产转移价格在双方之间相互抵消。若要作现实并购判断，这些遗漏要另加回来。</p>",
+          "refs": [
+            "GH86",
+            "PRINCETON"
+          ],
+          "question": 3
+        },
+        {
+          "id": "d-margin",
+          "title": "退路多赚一笔固定钱，为什么未必更愿意投入？",
+          "phase": "一个应记住的区别",
+          "minutes": 4,
+          "body": "<p>到这里，很容易把机制记成“外部收益提高，所以投入增加”。还差一个词：<strong>边际</strong>。</p><p>假设不合作收益突然多了一笔固定补贴，数额与投入多少无关。买方在事后谈判中可能拿得更多，但今天多投一点能额外拿多少，并没有因此变化。风险中性、无财富约束下，它就未必多投。</p><p>看一般的一阶条件就清楚了。由买方的议价收入减投资成本求导：</p><div class=\"math\">$$C_B^{@prime}(i)=@frac12(V_i+d_{B,i}-d_{S,i})$$</div><p>式子中是不合作收益对投资的导数。加常数不改导数；把 $d_B$ 从 0 改成 $@theta Ai$，却使导数增加 $@theta A$，所以改变了投入回报。</p><p>同样，如果买方投入也提高卖方的退路，卖方会在谈判中保留更多收益，买方自己的激励又受影响。式子里的 $-d_{S,i}$ 记录的正是这个渠道。</p><p>比较控制权安排时，可以把问题问得具体些：多花一单位不可契约投入，到最后我究竟能多拿多少？这比只比较谁现在收入高，更接近行为发生的原因。</p>",
+          "refs": [
+            "PRINCETON",
+            "GH86"
+          ],
+          "quiz": [
+            {
+              "id": "d-margin-q",
+              "prompt": "买方外部收益提高一个与投资无关的固定金额，能否由此断定其投资增加？",
+              "options": [
+                "能，收入提高必然增加投资",
+                "不能；要看外部收益对投资的导数",
+                "只有固定金额足够大时必然增加",
+                "本模型没有导数"
+              ],
+              "answer": 1,
+              "explanation": "在风险中性、自由转移、给定议价机制和合作仍可行的设定下，固定金额不改变边际投资回报。"
+            }
+          ],
+          "question": 3
+        },
+        {
+          "id": "d-boundary",
+          "title": "回到收购：公司还缺哪些信息？",
+          "phase": "应用与边界",
+          "minutes": 4,
+          "body": "<p>我们已经知道，收购可以通过资产控制改变投资激励，却不能因此认定收购一定划算。需要把实际合作中的投入和退路填进去。</p><div class=\"table-wrap\"><table><thead><tr><th>需要弄清什么</th><th>为什么会影响判断</th></tr></thead><tbody><tr><td>双方各做哪些难以事前约定的投入</td><td>找出真正存在投资激励问题的地方</td></tr><tr><td>合作破裂后，这些投入还能怎么用</td><td>写出各自不合作收益</td></tr><tr><td>控制资产怎样改变额外投入的回报</td><td>判断产权能改善哪边激励</td></tr><tr><td>谈判是否能达成有效合作</td><td>核对本章事后效率假设</td></tr><tr><td>整合增加哪些真实成本</td><td>避免只算激励收益不算组织代价</td></tr></tbody></table></div><p>熟练工的技能仍属于他，原负责人的判断和投入也不能通过买一台机器直接买到。工资、授权和持续关系的问题，收购以后仍可能存在。</p><p>事前价格可以分配较好产权安排多创造的收益，在本模型中不会改变投资斜率；若有人付不起，价格和融资又会影响哪种安排真正可行。</p><p>因此到这一页，对最初“买下来是不是就行”的问题，已经可以给出一个有内容的回答：先看产权究竟改变了谁的什么选择，再比较这些选择给总剩余带来的变化。</p>",
+          "refs": [
+            "HART",
+            "MITBOUND",
+            "AH11"
+          ],
+          "question": 3
+        },
+        {
+          "id": "d-check",
+          "title": "最后谈成了，也可能已经少做了一笔好投资",
+          "phase": "章末检验",
+          "minutes": 7,
+          "body": "<p>开章的那项改进，花 60 能增值 100，却因为投资者预期只能拿 50 而没有发生。事后双方再和气，也挽回不了一项从未做过的投入。这是第四章最需要分清的时间顺序。</p><details><summary>换组参数再算一遍：$A=1,B=2,@theta=0.5$</summary><p>买方拥有：$i=0.75,j=1$，净剩余 $1.96875$。卖方拥有：$i=0.5,j=1.5$，净剩余 $2.25$，更高 $0.28125$。第一最佳为 2.5，两种都没有完全实现。</p></details><p>下面三题分别问：事后与事前的区别，所有权究竟控制什么，以及较优产权为什么仍可能留有损失。</p>",
+          "refs": [
+            "GH86",
+            "PRINCETON",
+            "AH11"
+          ],
+          "quiz": [
+            {
+              "id": "d-end1",
+              "prompt": "事后交易有效率，能否保证事前投资有效率？",
+              "options": [
+                "能，只要最后合作",
+                "不能；投资回报可能被事后分享",
+                "只要双方风险中性就能",
+                "只要没有噪声就能"
+              ],
+              "answer": 1,
+              "explanation": "事后有效率解决给定投资下是否合作；事前投资取决于预期拿到多少边际收益。两个阶段不同。"
+            },
+            {
+              "id": "d-end2",
+              "prompt": "本章的资产所有权最准确指什么？",
+              "options": [
+                "对所有员工的人力资本所有权",
+                "合同未规定用途上的剩余控制权",
+                "所有未来收益必然全部归所有者",
+                "让合同变得完全"
+              ],
+              "answer": 1,
+              "explanation": "产权针对非人力资产未约定的使用权。合作仍可能需要另一方的人力投入与事后谈判。"
+            },
+            {
+              "id": "d-end3",
+              "prompt": "若 $A=2,B=1,@theta=1$ 且买方拥有，总剩余是多少？",
+              "answer": 2.375,
+              "tolerance": 0.001,
+              "explanation": "投资为 $i=2,j=0.5$。价值为 4.5，成本为 $(4+0.25)/2=2.125$，总剩余 2.375，仍低于第一最佳 2.5。",
+              "numeric": true
+            }
+          ],
+          "question": 3
+        },
+        {
+          "id": "d-takeaway",
+          "title": "产权为什么能影响一笔尚未发生的投入？",
+          "phase": "提取与记忆",
+          "minutes": 3,
+          "body": "<p>把一章压成一条时间线：今天先投入，明天再议价；产权改变明天谈不成时的退路，退路改变投入者今天预期能拿到的边际回报。</p><div class=\"math\">$$@pi_B=d_B+@frac{V-d_B-d_S}{2}$$</div><div class=\"math\">$$C_B^{@prime}(i)=@frac{V_i+d_{B,i}-d_{S,i}}2$$</div><p>第一式告诉你钱怎么分，第二式告诉你这种分法会让投资怎样变。只有把后一步接回前一步，才解释了为什么产权会影响效率。</p><p>本章手算特例里，资产应交给投资生产率较高的一方；但换一个外部用途或技术联系就需要重新比较。应当记住的是“外部收益的边际变化影响投资”，而不是一条脱离设定的所有权口号。</p><p>四章到这里都回到了同一件事：组织想要的结果，必须经过别人自己的选择。把那个人的收益、代价和可选项写清楚，制度的作用才看得见。</p>",
+          "refs": [
+            "GH86",
+            "HART",
+            "PRINCETON"
+          ],
+          "memory": {
+            "question": "产权如何通过事后谈判影响事前投资？",
+            "answer": "产权改变不合作收益及其对投资的边际反应。对称 Nash 下 $C_B^{@prime}=(V_i+d_{B,i}-d_{S,i})/2$。只提高固定外部收益未必增加投资；关键是边际回报。事后合作有效率也不保证事前投资足够。"
+          },
+          "question": 3
+        }
+      ],
+      "problem": "合同写不清关键投入时，资产该归谁？",
+      "questions": [
+        {
+          "title": "为什么不能事前写清楚？",
+          "start": "d-contract"
+        },
+        {
+          "title": "投入做完后，收益怎样分？",
+          "start": "d-timing"
+        },
+        {
+          "title": "预见分法，会投多少？",
+          "start": "d-invest"
+        },
+        {
+          "title": "哪种产权安排更划算？",
+          "start": "d-surplus"
+        }
+      ]
+    },
+    {
+      "id": "synthesis",
+      "number": "05",
+      "title": "回看四章",
+      "short": "综合练习与文献",
+      "duration": "15–20 分钟",
+      "pages": [
+        {
+          "id": "s-map",
+          "title": "再开一次维修店，你会先查什么？",
+          "phase": "综合",
+          "minutes": 4,
+          "body": "<p>现在回头看那家店。店里有人不够努力，可能是提成不足，也可能是业绩太受运气影响，强奖金贵得不值得；数量做得很漂亮，可能是总努力增加，也可能只是把复检时间挪走；团队没人补位，可能是额外收益落到了同伴手里；供应商不愿适配，可能是担心投入以后再谈价拿不回成本。</p><p>这些事情看起来都可以被叫作“激励有问题”，但这个说法还不够帮助你改制度。要先把具体是哪一张私人账写出来。</p><div class=\"table-wrap\"><table><thead><tr><th>眼前的现象</th><th>先追哪一个问题</th><th>接着检查</th></tr></thead><tbody><tr><td>工资与表现挂钩</td><td>员工能控制多少，承担多少风险</td><td>激励、参与与风险补偿</td></tr><tr><td>一个指标上升，另一项工作变差</td><td>员工换了哪一种做法</td><td>完整任务与成本联系</td></tr><tr><td>共同项目出力不足</td><td>多做一步的好处归谁</td><td>个人边际收入与团队产出</td></tr><tr><td>合作前不愿作专用投入</td><td>做完后怎样分钱，谈不成又能做什么</td><td>不合作收益与产权配置</td></tr></tbody></table></div><p>拿一个新的组织问题，可以先写：谁在什么时候选择什么，哪些东西能核实，钱怎样随结果变，真实成本落在谁身上。等这些问题有了答案，再决定需要哪一个模型。</p>",
+          "refs": [
+            "STOLE",
+            "HM91",
+            "H82",
+            "GH86"
+          ]
+        },
+        {
+          "id": "s-exam",
+          "title": "不用看讲义，四个账本还能重建吗？",
+          "phase": "综合测验",
+          "minutes": 10,
+          "body": "<p>每道题先想它属于哪一种选择：给定奖金选努力，给定两种奖金分配努力，给定分成选择个人投入，还是预见事后谈判选择事前投资。辨认对了，再把数字放进去。</p><p>答案错了也先别急着重新背公式。可以回到对应那一问，检查是把标准差当成方差，忘了另一个人的选择，还是把双方之间的转移当作真实成本。</p><details><summary>把四章放进同一个情境</summary><p>两名工程师维护共同设备：维修数量易测，复检难测；设备需要专用改进，未来合作还得重新谈。工资按带噪声结果支付，产生第一章的问题；两项工作争夺精力，产生第二章的问题；共同结果分成影响个人出力，是第三章的问题；先作专用投入、后谈回报，则进入第四章。一个场景可以同时需要几种分析。</p></details>",
+          "refs": [
+            "STOLE",
+            "HM91",
+            "H82",
+            "GH86"
+          ],
+          "quiz": [
+            {
+              "id": "s-a",
+              "prompt": "单任务：$r=1,c=1,@sigma=2,u_0=0$。线性合同中的最优奖金是多少？",
+              "answer": 0.2,
+              "tolerance": 0.001,
+              "explanation": "$b^*=1/(1+1@times1@times4)=0.2$。噪声标准差 2，对应方差 4。",
+              "numeric": true
+            },
+            {
+              "id": "s-b",
+              "prompt": "多任务：$b_1=b_2=1,@rho=0.5$。两任务相同，单项努力是多少？",
+              "answer": 0.6666666666666666,
+              "tolerance": 0.001,
+              "explanation": "对称时 $b=e+@rho e$，所以 $e=1/1.5=2/3$，处于内点。",
+              "numeric": true
+            },
+            {
+              "id": "s-c",
+              "prompt": "团队：4 人等分，$c=1$。每人努力相对第一最佳的比例是多少？",
+              "answer": 0.25,
+              "tolerance": 0.001,
+              "explanation": "均衡每人 0.25，第一最佳为 1，比例 1/4。不要把这个比例误当作总剩余比例。",
+              "numeric": true
+            },
+            {
+              "id": "s-d",
+              "prompt": "产权：$A=B=1,@theta=0.5$。买方拥有与卖方拥有的总剩余差是多少？",
+              "answer": 0,
+              "tolerance": 0.001,
+              "explanation": "由对称性两种产权的总剩余相同；投资分配会互换。也可用 $A^2-B^2=0$ 直接检查。",
+              "numeric": true
+            }
+          ]
+        },
+        {
+          "id": "s-reading",
+          "title": "想继续追，文献从这里读",
+          "phase": "来源说明",
+          "minutes": 4,
+          "body": "<p>正文里的数字和手算函数是为说明机制自设的。经典思想和一般框架来自以下原论文与大学讲义。可以按章往回查，不必从第一篇一路读到底。</p><div id=\"all-sources\"></div><p>第一章先看 Stole 的隐藏行动、线性合同部分。第二章对照 Holmström–Milgrom 与 Duke 推导，留意任务成本和信号噪声是两种联系。第三章读 Holmström 的团队模型，再用 Border 笔记核对证明条件。第四章可以先读 Hart 的讲演，再回到 Grossman–Hart 的模型。</p><h2>这次改写读过的知乎讲述</h2><p>这些回答用于参考怎样从情境进入问题，不替代上面的理论来源，也不把赞数当作结论正确的证据。</p><ul><li><a href=\"https://www.zhihu.com/question/51452702/answer/125923104\" target=\"_blank\" rel=\"noopener noreferrer\">刘锐：如何看待 2016 年契约理论诺奖？</a> 从绩效中的运气讲到多任务、团队与产权。</li><li><a href=\"https://www.zhihu.com/question/51452702/answer/126282328\" target=\"_blank\" rel=\"noopener noreferrer\">改之理zcw：同题回答</a> 先追问企业为什么有边界，再进入专用投入与产权。</li><li><a href=\"https://zhuanlan.zhihu.com/p/22884283\" target=\"_blank\" rel=\"noopener noreferrer\">Ke Jiang：一个案例讲清诺贝尔经济学获奖的契约理论</a> 用连续情境把不同问题接起来。</li><li><a href=\"https://www.zhihu.com/question/51495062/answer/134194618\" target=\"_blank\" rel=\"noopener noreferrer\">司马懿：契约理论对于国企改革有哪些借鉴意义？</a> 先让合同中的遗漏在具体工作里发生，再解释概念。</li></ul><p>复习时可用右上角的卡片，先自己说出一条推理，再展开核对。学习记录可以导出，原来版本已经保存的笔记也仍可随记录导出。</p>",
+          "refs": []
+        }
+      ]
+    },
+    {
+      "id": "appendix",
+      "number": "06",
+      "title": "数学备查",
+      "short": "用到时再看",
+      "duration": "5–10 分钟",
+      "pages": [
+        {
+          "id": "math",
+          "title": "用到时再查：求导、期望与均衡",
+          "phase": "预备知识",
+          "minutes": 7,
+          "body": "<p>这页放在课程后面，是为了查一个工具时不用打断正文。遇到某个符号不熟，再回到这里即可。</p><h2>求导在比较什么？</h2><p>若目标是 $f(e)=be-ce^2/2$，增加很小一点努力，收益约增加 $b$ 倍那一点，成本约增加 $ce$ 倍那一点。导数 $f^{@prime}(e)=b-ce$ 就在记录这次净变化。正值时还值得多做，负值时该少做。</p><div class=\"math\">$$f^{@prime}(e)=0@quad@Rightarrow@quad e=b/c$$</div><p>二阶导数为 $-c&lt;0$，意味着目标严格凹，找到的是唯一最高点。若可行努力只能非负，而求出的数为负，就要改看边界。多变量时同样需要检查约束，不能只把每个导数设为零。</p><h2>期望和方差在比较什么？</h2><p>期望表示模型中重复抽样的平均；方差表示围绕这个平均的波动。若冲击均值为零、方差为 $@sigma^2$，线性支付满足：</p><div class=\"math\">$$@mathbb E[a+b(e+@varepsilon)]=a+be,@qquad @operatorname{Var}[a+b(e+@varepsilon)]=b^2@sigma^2$$</div><p>奖金翻倍，方差是四倍。第一章的风险溢价正是由这个平方进入。</p><h2>纳什均衡为什么不等于全组最好？</h2><p>均衡检查的是：给定别人怎么做，我自己改一下还会不会更好。全组最优检查的是：能同时协调大家时，总剩余最高在哪里。第三章中，个人只获得部分边际收入，所以即便人人都不愿单独改变，离全组最优仍有距离。</p>",
+          "refs": [
+            "STOLE"
+          ],
+          "quiz": [
+            {
+              "id": "math-n",
+              "prompt": "若 $f(e)=3e-e^2$ 且 $e@ge0$，最优努力是多少？",
+              "answer": 1.5,
+              "tolerance": 0.001,
+              "explanation": "一阶条件是 $3-2e=0$，二阶导数为 $-2$，所以最大值在 $e=1.5$。",
+              "numeric": true
+            }
+          ]
+        }
+      ]
+    }
+  ]
 };
-const chapters=[];
-chapters.push({id:'orientation',number:'00',title:'开始之前',short:'学习方法与数学准备',duration:'10–15 分钟',pages:[
-P('start','组织的数学','课程说明',3,[
-'<p class="lead">工资、绩效、团队分成、资产所有权。四种常见安排，可以放进同一条分析链：<strong>规则改变个人回报，个人选择改变组织结果。</strong></p>',
-'<div class="diagram"><div><b>制度</b>谁拿多少，谁能决定</div><div class="arrow">→</div><div><b>行为</b>努力放在哪里，投入多少</div><div class="arrow">→</div><div><b>结果</b>净剩余、风险与投资</div></div>',
-'<p>本讲义讨论组织经济学中的四个主题。每章先提出一个问题，再写假设、求解模型、改变参数，最后用新问题检验理解。需要用到的求导、期望、方差和均衡概念，都在首次出现处解释。</p>',
-'<div id="course-route" class="route"></div>',
-box('<strong>建议用法</strong><p>准备纸笔。遇到“先做再看”，停下来写一步推导或一个预测。阅读时间按完成推导、实验和练习估计；只翻页会快很多。</p>'),
-'<p>正文和标签以大字号排版。可以使用底部按钮、目录或键盘左右方向键翻页。进度、作答和笔记仅保存在当前浏览器；右上角可导出笔记，也可打开完整打印版。</p>',
-'<p class="source-note">这是自编教学讲义，不是任何大学课程的官方版本。例子、参数与图形均为教学构造，不是企业实证数据。文献链接供核对原始理论，页面底部标明具体来源。</p>'
-],{refs:['STOLE','HM91','H82','GH86'],note:'你最想用这门课解释的一个组织问题是什么？'} ),
-P('method','每章要留下什么','学习目标',3,[
-'<p>学完一章，至少完成三件事：能从个人目标推出行为；能说出结论依赖哪条假设；能把一个实际问题改写为模型中的变量。</p>',
-tbl(['章节','需要能独立重建的结果','需要能判断的边界'],[
-['01 委托—代理','$b^*=1/(1+rc@sigma^2)$','它是在什么合同类中最优？'],
-['02 多任务激励','$@partial e_2/@partial b_1=-@rho/(1-@rho^2)$','努力到零以后，内点公式还成立吗？'],
-['03 团队生产','$e_i=1/(nc)$；预算平衡的矛盾','等分收入的例子和一般不可能性有何区别？'],
-['04 产权','$i^*=(V_i+d_{B,i}-d_{S,i})/2$ 的相应一阶条件','外部选项的水平和边际变化有什么区别？']
-]),
-'<p>章末有公式卡与迁移题。复习时先隐藏答案，尝试重建推导，再看卡片。记住一个公式但忘记它比较的是谁的收益，容易得出相反判断。</p>',
-box('<strong>本课程始终区分三类表述</strong><p>经典理论：文献中的概念或结果。教学模型：为了可算而自设的函数与参数。应用判断：由模型启发、仍需现实资料支持的分析。</p>','green'),
-'<p>推荐分四次学习：第一章约 40–55 分钟；第二章约 35–50 分钟；第三章约 30–45 分钟；第四章约 40–55 分钟。熟悉微积分时可跳过数学补充，仍建议完成所有实验和章末题。</p>'
-],{refs:['STOLE','DUKE','BORDER','PRINCETON']}),
-P('math','数学准备：从目标到选择','预备知识',7,[
-'<p><strong>最优化。</strong>行为人面对一个目标函数，选择能使它最大的行动。若目标是 $f(e)=be-ce^2/2$，增加一点努力的收益是 $b$，成本是 $ce$。</p>',
-eq("f'(e)=b-ce=0@quad@Rightarrow@quad e^*=b/c"),
-'<p>二阶导数 $f^{@prime@prime}(e)=-c&lt;0$，说明目标严格凹：一阶条件找到唯一最大值。</p>',
-'<p><strong>约束与角点。</strong>如果努力不得为负，而求导得到 $e=-1$，答案是边界 $e=0$。有多个变量时，先算内点，再检查边界是否更好。第二章的实验会自动做这一步。</p>',
-'<p><strong>期望与方差。</strong>期望是模型中重复抽样的平均，方差衡量围绕平均的波动。若随机冲击 $@varepsilon$ 均值为零、方差为 $@sigma^2$：</p>',
-eq('@mathbb E[a+b(e+@varepsilon)]=a+be,@qquad @operatorname{Var}[a+b(e+@varepsilon)]=b^2@sigma^2'),
-'<p><strong>纳什均衡。</strong>每个人在给定别人行动时都选自己的最优行动；没有人能只靠自己改变行动获益。它不等于总收益最大。第三章会把两者放在一起计算。</p>',
-box('<strong>读公式时先读动词</strong><p>$@max_e$：由谁选择什么？$@mathbb E$：对哪种随机性取平均？$@partial e/@partial b$：改变奖金，观察努力如何变？</p>'),
-det('检查：若 $b=2,c=4$，努力是多少？','<p>$e^*=2/4=0.5$。若固定工资从 10 变成 20，上述目标的斜率不变，因此这个简化模型中的努力仍为 0.5。固定工资在其他模型中可能有行为效应。</p>')
-],{refs:['STOLE'],quiz:[N('math-n','若 $f(e)=3e-e^2$ 且 $e@ge0$，最优努力是多少？',1.5,.001,'一阶条件是 $3-2e=0$，二阶导数为 $-2$，所以最大值在 $e=1.5$。')]} )
-]});
-chapters.push({id:'agency',number:'01',title:'委托—代理：激励与保险',short:'奖金为什么不能只看努力',duration:'40–55 分钟',pages:[
-P('a-question','同一份奖金，为什么有人嫌低，有人嫌险？','提出问题',2,[
-'<p class="lead">一名员工可以更努力，却不能控制市场波动。你只看到最后的销售额。工资应当随销售额变化多少？</p>',
-'<p>这不是一个只需回答“奖励要足够大”的问题。把收入绑定到产出，既能改变努力，也会把不可控风险转给员工。员工若厌恶风险，公司需要为这种风险支付补偿。</p>',
-'<p>我们从最简单的单任务模型出发：员工只选择一种努力，公司只能按带噪声的产出付钱。工资设为固定部分加绩效奖金。先求员工的选择，再求公司的最优奖金。</p>',
-box('<strong>本章问题</strong><p>什么条件下奖金应当较强？什么条件下应当较弱？如何从公式中区分激励、风险和参与意愿？</p>','green'),
-'<p>学习结束后，试着不看正文重建：$e=b/c$、参与约束、风险溢价 $rb^2@sigma^2/2$，以及最优奖金 $b^*$。四者是同一段推导的不同环节。</p>'
-],{refs:['STOLE','H79'],note:'先预测：市场波动增大时，你会提高还是降低绩效奖金？写下理由。'}),
-P('a-model','先把合同和时序写清楚','模型假设',4,[
-'<p>将产出的单位价值标准化为 1。委托人是公司，代理人是员工。员工的努力 $e@ge0$ 不可直接写进可执行合同，产出 $y$ 可以。</p>',
-eq('y=e+@varepsilon,@quad @varepsilon@sim N(0,@sigma^2),@qquad w=a+by'),
-tbl(['符号','含义','限制'],[['$e$','员工努力','非负'],['$c$','努力成本系数，成本为 $ce^2/2$','$c&gt;0$'],['$a$','固定工资','可自由调整，可为负'],['$b$','每单位产出的奖金','$b@ge0$'],['$r$','绝对风险厌恶系数','$r&gt;0$，风险中性作极限'],['$@sigma$','冲击标准差','$@sigma@ge0$，不是方差'],['$u_0$','员工的保留确定性等价','外部机会的货币等价']]),
-'<div class="diagram"><div><b>1 签合同</b>公司给出 $a,b$，员工决定接受</div><div class="arrow">→</div><div><b>2 选努力</b>员工选择 $e$，冲击尚未实现</div><div class="arrow">→</div><div><b>3 看产出</b>冲击实现，依约支付工资</div></div>',
-'<p>公司风险中性，能承诺履约；员工具有 CARA 效用。暂时不加入最低工资、有限责任、财富限制或其他任务。上述条件让我们把注意力集中在激励与保险之间。</p>',
-box('<strong>模型范围</strong><p>本章只在 $w=a+by$ 这类线性合同中找最优解。正态噪声和指数效用本身，并不能证明所有静态环境的最优合同都必须线性。</p>')
-],{refs:['STOLE','HM87']}),
-P('a-firstbest','先求一个可比较的基准','第一最佳',3,[
-'<p>假设努力能够直接约定并执行。公司可以规定努力，再给员工确定的补偿，员工无需承担销售波动。此时总净收益只需减去真实努力成本：</p>',
-eq('@max_{e@ge0}@; e-@frac{c}{2}e^2'),
-eq('1-ce=0@quad@Rightarrow@quad e^{FB}=@frac1c'),
-'<p>这个基准叫第一最佳，FB 是 first best。它暂时移除了信息约束，让我们知道“如果努力可契约，能做到什么”。它不是假定现实中公司已经能做到。</p>',
-'<p>工资是公司和员工之间的转移，计算双方总剩余时会相互抵消；努力成本是真实损失，不会抵消。若员工承担风险，风险补偿也会影响达到给定福利水平的成本。</p>',
-box('<strong>分析习惯</strong><p>每次看到组织低效的结论，先问它偏离哪个基准。没有基准，无法区分信息成本和本来就昂贵的生产。</p>','green'),
-det('为什么一阶条件是 $1=ce$？','<p>多一点努力带来 1 单位产出，额外成本约为 $ce$。若前者更大，应增加努力；若后者更大，应减少。相等时净收益到顶，且二阶导数为 $-c&lt;0$。</p>')
-],{refs:['STOLE'],quiz:[N('a-fb','若 $c=2$，第一最佳努力是多少？',.5,.001,'最大化 $e-e^2$，得到 $1-2e=0$，所以 $e^{FB}=0.5$。')]}),
-P('a-ic','员工会选择什么努力？','激励相容',4,[
-'<p>先暂时让员工风险中性。他关心期望工资减努力成本；$@mathbb E[@varepsilon]=0$，所以目标为：</p>',
-eq('@max_{e@ge0}@; a+be-@frac c2e^2'),
-eq('b-ce=0@quad@Rightarrow@quad e(b)=@frac bc'),
-'<p>这条关系是员工的最优反应。公司不能一面设奖金为 $b$，一面假定员工会选择另一个随意指定的努力。合同诱导的行动必须确实是员工愿意选的行动，这就是激励相容，简称 IC。</p>',
-'<p>在这个模型里，固定工资 $a$ 不改变努力：求导时它消失。它仍然影响员工是否接受工作。<strong>影响接受与影响努力，是两个不同的问题。</strong></p>',
-box('<strong>不要漏写行为约束</strong><p>公司的优化问题必须带上 $e=b/c$。直接最大化总产出，再宣布员工会照做，就略去了委托—代理问题。</p>'),
-'<p>若 $c=2,b=0.6$，员工选 $e=0.3$；将固定工资提高 100 并不改变本模型中的这个数值。这个结论依赖准线性或后文的 CARA 无财富效应，不能据此断言现实中底薪永远不影响行为。</p>'
-],{refs:['STOLE'],quiz:[Q('a-ic-q','公司希望诱导 $e=0.4$，且 $c=2$。线性合同需要什么奖金？',['$b=0.2$','$b=0.4$','$b=0.8$','单纯提高 $a$ 即可'],2,'由 $e=b/c$，得到 $b=ce=0.8$。固定工资不能替代这条边际激励条件。')]}),
-P('a-risk','风险厌恶怎样进入计算？','数学补充',6,[
-'<p>风险厌恶意味着，在均值相同的情况下，员工偏好波动较小的收入。我们采用常绝对风险厌恶效用，CARA：</p>',
-eq('U=-@exp@left[-r@left(w-@frac c2e^2@right)@right],@qquad r&gt;0'),
-'<p>这里努力成本进入货币净收益。给定努力，净收益 $X=w-ce^2/2$ 是正态变量。用一个确定的金额 CE，使员工在拿 CE 和面对随机 $X$ 时效用相同；CE 称为确定性等价。</p>',
-eq('@operatorname{CE}(X)=@mathbb E[X]-@frac r2@operatorname{Var}(X)'),
-'<p>线性工资的方差为 $b^2@sigma^2$。因此：</p>',
-eq('@operatorname{CE}=a+be-@frac c2e^2-@underbrace{@frac r2b^2@sigma^2}_{@text{风险溢价}}'),
-'<p>员工增加努力不会改变这个模型中的噪声方差，风险项对 $e$ 的导数为零，最优努力仍为 $b/c$。<strong>风险却会改变公司为了让员工接受合同而需要支付的金额。</strong></p>',
-det('推导：为什么正态分布给出这个 CE？','<p>若 $X@sim N(@mu,s^2)$，正态分布的指数矩给出 $@mathbb E[e^{-rX}]=e^{-r@mu+r^2s^2/2}$。令 $-e^{-rCE}=-@mathbb E[e^{-rX}]$，取对数即得 $CE=@mu-rs^2/2$。这里是精确公式；一般分布或一般效用下，均值减半倍方差通常只是一种近似。</p>'),
-box('<strong>单位检查</strong><p>$@sigma$ 是标准差，风险项中用的是 $@sigma^2$。奖金翻倍，员工承担的工资方差变为四倍，而非两倍。</p>','green')
-],{refs:['DUKE','STOLE'],quiz:[N('a-risk-n','若 $r=2,b=0.5,@sigma=2$，风险溢价 $rb^2@sigma^2/2$ 是多少？',1,.001,'$2@times0.25@times4/2=1$。先对奖金和标准差平方。')]}),
-P('a-ir','员工为什么愿意签？','参与约束',4,[
-'<p>员工可以选择外部机会，其确定性等价为 $u_0$。接受合同至少要满足：</p>',
-eq('a+be-@frac c2e^2-@frac r2b^2@sigma^2@ge u_0', '参与约束，IR'),
-'<p>公司有全部议价权、固定工资可自由调整，因此在雇佣发生的最优解中，参与约束恰好取等号。若还多付一点固定工资，公司可以降低它而不改变努力。</p>',
-eq('a=u_0-be+@frac c2e^2+@frac r2b^2@sigma^2'),
-'<p>把它代回公司的期望利润 $@Pi=e-a-be$：</p>',
-eq('@Pi=e-@frac c2e^2-@frac r2b^2@sigma^2-u_0'),
-'<p>现在可以看到公司实际权衡的三个部分：努力产生的价值、真实努力成本、让员工承担收入波动所需的风险补偿。员工外部机会 $u_0$ 会影响是否雇佣，在当前假设下不改变最优奖金的斜率。</p>',
-box('<strong>负固定工资意味着什么？</strong><p>它可解释为员工先支付某种固定费用，再获得绩效收入。现实中常有财富和法律限制，本模型暂时允许这种转移。若限制 $a@ge0$，上述消元可能失效，最优合同需重新求解。</p>'),
-'<p>若算出的最大利润为负，公司还可能选择不雇佣。实验为便于比较，展示的是“给定雇佣”时的合同，不把雇佣决策隐藏在奖金公式里。</p>'
-],{refs:['STOLE']}),
-P('a-optimum','把两道约束放回公司的问题','核心推导',5,[
-'<p>激励相容给出 $e=b/c$；参与约束已经用来解出 $a$。公司只剩一个选择变量 $b$：</p>',
-eq('@max_{b@ge0}@;@Pi(b)=@frac bc-@frac{b^2}{2c}-@frac r2b^2@sigma^2-u_0'),
-eq('@Pi^{@prime}(b)=@frac1c-@frac bc-rb@sigma^2=0'),
-eq('@boxed{b^*=@frac1{1+rc@sigma^2}},@qquad @boxed{e^*=@frac1{c(1+rc@sigma^2)}}'),
-'<p>二阶导数为 $-1/c-r@sigma^2&lt;0$，所以这是线性合同类中的唯一最优奖金。因子 $rc@sigma^2$ 越大，让员工承担波动以换取努力就越昂贵。</p>',
-tbl(['参数变化','奖金 $b^*$','解释'],[['$r$ 上升','下降','员工更不愿承担给定收入风险'],['$@sigma^2$ 上升','下降','绩效中不可控成分更大'],['$c$ 上升','下降','同样奖金能换来的努力更少'],['$r@to0$ 或 $@sigma@to0$','趋近 1','本模型中的保险代价消失']]),
-'<p>风险中性或没有噪声时，$b^*=1$：员工拿到全部边际产出，公司通过固定部分回收剩余。若不允许负固定工资或要求员工承担的损失有限，这个安排可能不可行。</p>',
-box('<strong>记忆锚点</strong><p>分子是 1；分母是“1 加风险与成本的乘积”。先记清为什么奖金越强，风险补偿增长越快，再记公式。</p>','green')
-],{refs:['STOLE','DUKE'],note:'合上公式，从期望利润重推 $b^*$。哪一步用到了参与约束？'}),
-P('a-lab','实验：强激励值不值得？','参数实验',5,[
-'<p>先保持 $c=1,r=1,@sigma=1$，预测利润最高的奖金。再拖动 $b$ 检查。图中净剩余已经减去努力成本和风险溢价，外部机会设为 $u_0=0$。</p>',
-'<div data-lab="agency"></div>',
-'<ol><li>固定其余参数，把 $@sigma$ 从 0 改为 2。最优奖金如何变化？</li><li>点击“使用最优奖金”，记录努力与第一最佳的差距。</li><li>把风险厌恶降到 0。为什么市场噪声仍在，但最优奖金恢复为 1？</li></ol>',
-'<p>固定工资随合同自动调整以令 IR 绑定。这里没有最低工资或有限责任约束。图上的低利润也可能意味着公司不该雇佣，而不是应该强迫员工接受更低福利。</p>',
-det('实验应观察到什么？','<p>默认参数下 $b^*=0.5,e=0.5$。当 $@sigma=2$ 时，$b^*=0.2$。风险中性时，员工不要求收入波动补偿，因此公司可用强激励而不支付风险溢价；这依赖员工可承担损失及固定转移不受限。</p>')
-],{refs:['DUKE'],note:'写一个你从实验中得到的比较静态，再注明它保持不变的参数。'}),
-P('a-information','好指标不是越多越好','信息性原则',4,[
-'<p>绩效指标的价值在于帮助判断隐藏行动。一个新指标若在已知产出的条件下，仍提供关于努力的额外信息，就可能改善激励安排；完全重复的信息没有这个价值。这是 Holmström 信息性原则的基本含义。</p>',
-'<p>考虑一个教学例子：你的销售和同业销售都受共同景气影响。令</p>',
-eq('y=e+z+u,@qquad p=z+v'),
-'<p>$z$ 是共同冲击；$u,v$ 是各自噪声。三者相互独立、均值为零；同业指标不受你的努力影响。使用绩效指数 $y-@lambda p$ 不会改变对你努力的敏感度，却能剔除部分共同风险。</p>',
-eq('@operatorname{Var}(y-@lambda p)=(1-@lambda)^2@sigma_z^2+@sigma_u^2+@lambda^2@sigma_v^2'),
-eq('@lambda^*=@frac{@sigma_z^2}{@sigma_z^2+@sigma_v^2}'),
-'<p>这是对给定指数的方差最小化。同行指标噪声越大，扣除它的权重越小。若员工能影响同业数据，或同业行为随你的行动而变，这个推导的假设就需要修改。</p>',
-box('<strong>可带走的判断</strong><p>设计考核前，先问哪些波动来自个人行动，哪些来自共同环境。指标相关性本身不够；要看它能否增加关于行动的信息。</p>','green')
-],{refs:['H79','H82'],quiz:[Q('a-info-q','若共同冲击方差为 4，同业独有噪声方差为 4，最小方差指数中的 $@lambda^*$ 是多少？',['0','0.5','1','2'],1,'$@lambda^*=4/(4+4)=0.5$。同行也有噪声，完全扣除通常过度。')]}),
-P('a-worked','一道完整算例','计算练习',4,[
-'<p>设 $c=2,r=1,@sigma=1,u_0=0.1$。产出单位价值仍为 1。请按顺序写出奖金、努力、风险溢价、固定工资和利润，保留分数到最后。</p>',
-det('第 1 步：奖金与努力',eq('b^*=@frac13,@qquad e^*=@frac16,@qquad e^{FB}=@frac12')),
-det('第 2 步：风险与努力成本',eq('RP=@frac12@left(@frac13@right)^2=@frac1{18},@qquad C=@frac22@left(@frac16@right)^2=@frac1{36}')),
-det('第 3 步：用 IR 求固定工资',eq('a=@frac1{10}-@frac1{18}+@frac1{36}+@frac1{18}=@frac{23}{180}@approx0.1278')),
-det('第 4 步：公司利润',eq('@Pi=@frac16-@frac1{36}-@frac1{18}-@frac1{10}=-@frac1{60}')),
-'<p>利润为负，说明若不雇佣的收益为零，公司宁可不雇佣。最优奖金公式给出的是合同内的最优选择，不能代替参与交易的判断。</p>',
-'<p>再把员工外部机会改为零：最优奖金和努力不变，利润变为 $1/12$。这个例子把“如何设计合同”和“是否值得交易”分开了。</p>'
-],{refs:['STOLE'],quiz:[N('a-work-n','保留上述 $c,r,@sigma$，将 $u_0$ 改为 0，最优利润是多少？输入小数。',1/12,.001,'努力减努力成本减风险溢价：$1/6-1/36-1/18=1/12@approx0.0833$。')]}),
-P('a-check','换一个条件，结论还成立吗？','章末检验',6,[
-'<p>先作答，再看反馈。前两题检查推导，最后一题检查你是否知道公式不能直接用于什么情形。</p>',
-box('<strong>迁移任务</strong><p>你负责一名员工的绩效方案。写下：可核实产出是什么；员工能改变什么；最主要的外生冲击是什么；新增哪个指标能帮助区分努力与运气。暂时不要直接给奖金比例。</p>'),
-det('参考分析框架','<p>例如教学构造的维修岗位：已修复工单数量可核实；排查和复核努力不易直接核实；设备老化程度影响工单难度。先比较同类故障或控制设备条件，再决定奖金强度。若复核质量也是任务，这就需要下一章的模型。此例说明分析顺序，不是经过实证验证的薪酬建议。</p>')
-],{refs:['H79','STOLE'],quiz:[
-Q('a-end1','当 $r,c$ 不变，噪声标准差翻倍时，哪个说法正确？',['最优奖金必然减半','分母的风险项变为原来的四倍','风险项不变','努力必然翻倍'],1,'公式使用方差。若原来的风险项是 $rc@sigma^2$，现在是 $4rc@sigma^2$；奖金不是简单减半。'),
-Q('a-end2','为什么公司不能直接令 $e=e^{FB}$？',['员工没有理性','努力成本无法计算','努力不可契约，必须由合同诱导','第一最佳没有定义'],2,'公司受到 IC 约束；希望某种努力与员工愿意选择该努力是两件事。'),
-Q('a-end3','如果员工不得支付固定费用，算出 $a&lt;0$ 后应怎么做？',['直接忽略限制','仍宣布原合同最优','将 $a$ 改为 0，其他量自动不变','加上 $a@ge0$ 重新求解'],3,'不能只修补一个数值。固定工资约束可能改变 IR 是否绑定以及最优奖金。')
-],note:'用不超过三句话说明：奖金的收益、奖金的成本，以及公式的适用范围。'}),
-P('a-takeaway','公式卡 01｜先解员工，再解公司','提取与记忆',3,[
-eq('e(b)=@frac bc,@qquad RP=@frac r2b^2@sigma^2'),
-eq('b^*=@frac1{1+rc@sigma^2},@qquad e^{FB}=@frac1c'),
-'<p><strong>核心思想：</strong>激励把努力的收益交给员工，也把产出的噪声交给员工。风险厌恶和测量噪声越强，强奖金越昂贵。</p>',
-'<p><strong>可执行的分析顺序：</strong>写产出与噪声 → 写员工目标 → 求 IC → 用 IR 解固定工资 → 优化奖金 → 检查约束与是否值得雇佣。</p>',
-'<p><strong>适用条件：</strong>单位产出价值为 1；二次成本；正态且方差不随努力变的噪声；CARA；线性合同；可自由调整固定转移；公司风险中性并能承诺。</p>',
-box('<strong>两天后不看答案重建</strong><p>从 $@Pi(b)$ 求一次导数。再说明为何只提高底薪在这个模型里不改变努力，以及这句话不能怎样推广。</p>','green'),
-'<p>下一章将放松“一名员工只做一种任务”。一旦努力有方向，奖金会影响任务之间的分配。</p>'
-],{refs:['STOLE','DUKE'],memory:{question:'单任务线性合同中，为什么最优奖金不是永远等于 1？',answer:'因为更强的奖金让风险厌恶的员工承担更大收入波动，公司必须补偿。CARA、正态、二次成本、单位价值和自由转移下，线性合同内 $b^*=1/(1+rc@sigma^2)$；员工努力 $e=b/c$。'}})
-]});
-chapters.push({id:'multitask',number:'02',title:'多任务：奖金改变努力的方向',short:'从考核指标到任务分配',duration:'35–50 分钟',pages:[
-P('b-question','数量增加，质量为什么可能下降？','提出问题',3,[
-'<p class="lead">一个岗位同时要求速度和复核。你能清楚计量速度，却很难在当月判断复核质量。只对速度加奖，会发生什么？</p>',
-'<p>单任务模型只问努力多少。多任务模型还要问努力放在哪里。员工不必弄虚作假，也可能通过改变任务分配，让被考核指标变好而组织真正重视的结果变差。</p>',
-'<p>这是一种可能的机制，不能只凭“数量升、质量降”的相关性就认定成立。要检查两项任务是否争夺时间或提高彼此的边际成本，以及质量是否本来就受到激励。</p>',
-box('<strong>本章的两层模型</strong><p>先用固定时间的例子理解努力方向，再用二次成本模型计算交叉效应。最后看噪声、激励向量与工作设计如何联动。</p>','green'),
-'<p>章末应能解释：为什么一个任务的奖金会影响另一个任务；为什么固定工资有时合理；为什么不一定合理。</p>'
-],{refs:['HM91'],note:'写出你熟悉的一个岗位的两项任务。哪个易计量？它们是否争夺同一种资源？'}),
-P('b-attention','先固定总时间，只研究分配','教学模型',4,[
-'<p>一天只有 1 单位可分配时间。令 $t$ 用于可计量任务，$1-t$ 用于另一任务。没有绩效奖金时，员工偏好的分配为 $t_0$；偏离它会产生协调或私人不适成本。</p>',
-eq('@max_{0@le t@le1}@;a+bt-@frac k2(t-t_0)^2,@qquad k&gt;0'),
-eq('t^*=@min@{1,@max@{0,t_0+b/k@}@}'),
-'<p>这个模型把“没有奖金时仍会做质量工作”明确写进偏好，而没有凭空假设它存在。$t_0$ 可代表专业偏好或既有规范的简化；它不是 Holmström–Milgrom 原文的固定参数。</p>',
-'<p>若 $t_0=0.5,k=1$，无奖金时两项各用一半时间。奖金 $b=0.3$ 时，可计量任务占 $0.8$，另一项只剩 $0.2$。奖金提高总绩效指标，却没有增加总时间。</p>',
-'<div data-lab="attention"></div>',
-box('<strong>先预测再拖动</strong><p>若公司同等重视两项任务，而员工原本恰好均衡分配，数量奖金能提高总价值吗？请同时计算偏离原分配的成本。</p>')
-],{refs:['HM91'],note:'此模型的挤出依赖固定时间。若额外努力能增加总时间，你预期结果会怎样变化？'}),
-P('b-cross','把固定时间改为相互关联的成本','模型假设',4,[
-'<p>现在允许两项努力的总量改变。令 $e_1,e_2@ge0$，成本为：</p>',
-eq('C(e_1,e_2)=@frac12(e_1^2+e_2^2+2@rho e_1e_2),@qquad |@rho|&lt;1'),
-'<p>$|@rho|&lt;1$ 让成本矩阵正定，即成本严格凸。员工期望绩效收入为 $b_1e_1+b_2e_2$，固定工资不影响最优努力。</p>',
-eq('C_1=e_1+@rho e_2,@qquad C_2=e_2+@rho e_1,@qquad C_{12}=@rho'),
-tbl(['参数','对私人边际成本的含义','注意'],[['$@rho&gt;0$','做更多任务 1，提高任务 2 的边际成本','两任务在成本上替代'],['$@rho=0$','两项成本相互独立','一个任务加奖不直接挤出另一个'],['$@rho&lt;0$','做更多任务 1，降低任务 2 的边际成本','两任务在成本上互补']]),
-'<p>这里的替代或互补描述员工的成本结构。它与产出技术是否互补、两个指标的统计噪声是否相关，是三个不同问题。</p>',
-det('正定是什么意思？','<p>对任意非零向量 $x$ 都有 $x^THx&gt;0$。本例矩阵 $H$ 的两个特征值为 $1+@rho$ 和 $1-@rho$，在 $|@rho|&lt;1$ 时均为正，因此成本有唯一低点，员工目标严格凹。</p>')
-],{refs:['DUKE','HM91']}),
-P('b-response','同时解出两种努力','核心推导',5,[
-'<p>在两项努力都严格为正的内点，员工最大化绩效收入减成本，一阶条件为：</p>',
-eq('b_1=e_1+@rho e_2,@qquad b_2=e_2+@rho e_1'),
-'<p>用第一式减去 $@rho$ 倍的第二式，就可以消去 $e_2$。再对称地处理另一项：</p>',
-eq('@boxed{e_1=@frac{b_1-@rho b_2}{1-@rho^2}},@qquad @boxed{e_2=@frac{b_2-@rho b_1}{1-@rho^2}}'),
-eq('@frac{@partial e_2}{@partial b_1}=-@frac{@rho}{1-@rho^2}'),
-'<p>只提高任务 1 的奖金：在内点且 $@rho&gt;0$ 时，任务 2 努力下降。若 $@rho=0$，交叉效应为零；若 $@rho&lt;0$，任务 2 努力反而增加。因此“加强考核必然损害另一任务”并不是这个模型的结论。</p>',
-'<p>令 $b_1=0.8,b_2=0.6,@rho=0.5$，则 $e_1=2/3,e_2=4/15$。保持其余量不变，把 $b_1$ 增至 1，$e_2$ 降至 $2/15$。</p>',
-box('<strong>记住符号，不只记住故事</strong><p>交叉效应与 $@rho$ 的符号相反。先辨认成本关系，再预测奖金的外溢影响。</p>','green')
-],{refs:['DUKE'],quiz:[N('b-derivative','若 $@rho=0.5$，内点的 $@partial e_2/@partial b_1$ 是多少？',-2/3,.001,'$-0.5/(1-0.25)=-2/3$。这表示奖金增加一小单位时的局部变化率，不是任务 2 的努力水平。')]}),
-P('b-boundary','努力不能小于零','约束与角点',4,[
-'<p>若一直提高 $b_1$，内点公式可能算出负的 $e_2$。员工不能付出负努力，此时需要检查边界。对 $b_1,b_2@ge0$ 且 $0&lt;@rho&lt;1$：</p>',
-eq('(e_1,e_2)=@begin{cases}(0,b_2),&b_1@le@rho b_2,@@(@frac{b_1-@rho b_2}{1-@rho^2},@frac{b_2-@rho b_1}{1-@rho^2}),&@rho b_2&lt;b_1&lt;b_2/@rho,@@(b_1,0),&b_1@ge b_2/@rho.@end{cases}'),
-'<p>到达最后一种情形后，继续加任务 1 奖金，任务 2 仍为零，不能再套用负的内点斜率。实验程序比较所有可行边界及内点的目标值，避免让曲线越过可行范围。</p>',
-'<p>还有一个容易漏掉的起点问题：若 $b_2=0,@rho&gt;0$，且任务 2 没有任何私人收益，那么它本来就是零。此时不能说奖金把原本积极的质量努力挤走了。</p>',
-box('<strong>写应用时要补足行为来源</strong><p>如果你认为员工无奖金也会做好质量，需要说明原因，例如职业规范、晋升、内在偏好或其他奖励。模型必须把相应回报或约束写进去。</p>'),
-det('如何用边际条件判断角点？','<p>在 $e_2=0,e_1=b_1$ 时，增加一点任务 2 努力的私人净收益为 $b_2-@rho b_1$。若它不大于零，员工不会离开边界。若它大于零，零努力就不可能最优。</p>')
-],{refs:['DUKE'],quiz:[Q('b-corner','若 $b_1=1.5,b_2=0.5,@rho=0.5$，应选哪组努力？',['$(1.667,-0.333)$','$(1.5,0)$','$(0,0.5)$','$(1,1)$'],1,'内点给出负的第二项而不可行。边界上 $e_1=b_1=1.5$，且 $b_2-@rho b_1=-0.25&lt;0$。')]}),
-P('b-lab','实验：奖金是在增加努力，还是改变方向？','参数实验',5,[
-'<p>两项任务最初都受正奖金激励。保持 $b_2$ 不变，逐渐增加 $b_1$；再把任务关系从替代切换到互补。图上的每个点都是员工自己最优选择的结果。</p>',
-'<div data-lab="multitask"></div>',
-'<ol><li>在 $@rho=0.5$ 时，找到任务 2 降为零的奖金阈值。</li><li>令 $@rho=0$。增加 $b_1$ 是否还会改变 $e_2$？</li><li>令 $@rho=-0.5$。比较两个任务的努力变化。</li></ol>',
-'<p>本实验只计算员工的最优反应，尚未求公司的最优奖金，也没有给噪声设定数值。不能用“某组努力更大”直接判定它对公司更好；还需要产出价值、成本和风险。</p>',
-det('实验解释','<p>替代情形中，$b_1=b_2/@rho$ 时任务 2 触及零；独立情形交叉效应为零；互补情形中，任务 1 奖金会间接鼓励任务 2。要从反应曲线走向合同设计，需要下一页的公司目标。</p>')
-],{refs:['DUKE'],note:'选择一组参数，先算出两种努力，再用图核对。记录一次内点和一次角点。'}),
-P('b-vector','多个任务的共同语言','进阶推导',6,[
-'<p>把努力与奖金写成向量：$e,b$。成本矩阵 $H$ 正定；产出信号为 $y=e+@varepsilon$，噪声协方差矩阵为 $@Sigma$；公司对努力的价值为 $v^Te$。</p>',
-eq('C(e)=@frac12e^THe,@qquad w=a+b^Ty'),
-'<p>CARA、联合正态、线性合同与自由固定转移下，风险溢价为 $rb^T@Sigma b/2$。在内点，员工的一阶条件给出：</p>',
-eq('b=He,@qquad e=H^{-1}b'),
-'<p>代入公司扣除风险成本后的目标：</p>',
-eq('S(b)=v^TH^{-1}b-@frac12b^TH^{-1}b-@frac r2b^T@Sigma b'),
-eq('H^{-1}v-H^{-1}b-r@Sigma b=0'),
-eq('@boxed{b^*=(I+rH@Sigma)^{-1}v}'),
-'<p>这是一组二次成本下的内点公式，若诱导负努力或存在合同约束，需要重新处理。矩阵 $H$ 描述任务成本联系，$@Sigma$ 描述测量噪声联系。最优奖金同时取决于二者。</p>',
-det('不用矩阵也能理解的特殊情形','<p>若任务成本与噪声都相互独立，$H$、$@Sigma$ 都为对角矩阵，那么每项 $b_i^*=v_i/(1+rH_{ii}@sigma_i^2)$。每项任务可以分别处理；有交叉项时，一项任务的考核质量会影响其他项的最优奖金。</p>')
-],{refs:['DUKE'],note:'尝试把上式缩成一个任务，检查是否回到第一章的公式。'}),
-P('b-weak','为什么较弱的绩效工资可能合理？','经典思想与边界',4,[
-'<p>Holmström–Milgrom 的重要贡献之一，是把绩效工资和完整岗位任务联系起来。若任务争夺努力，而某些重要任务难以测量，只强化易测量部分可能造成行为偏移。</p>',
-'<p>“弱激励”可以是对测量困难的理性反应。例如固定时间模型中，公司同等重视两任务、基准分配 $t_0=1/2$ 已经均衡。非负数量奖金只会让分配偏离该点，还产生偏离成本，因此最优数量奖金为零。</p>',
-'<p>这个例子中的零奖金依赖固定时间、相等任务价值和基准偏好。若两任务都没有其他动机、总努力可以增加，零奖金也可能让两项努力都为零。不能据此把固定工资当成普遍最优方案。</p>',
-box('<strong>一个可实际使用的问题</strong><p>当你想给某个指标加奖时，先写出员工为了提高它最可能减少的另一项工作。再核对这项减少是否进入公司的考核或价值计算。</p>','green'),
-'<p>低强度激励并不等于没有组织安排。工作分配、质量门槛、同行评价、晋升和持续关系，都可能影响行为；若要分析它们，需要把相关机制加入模型。</p>'
-],{refs:['HM91','STOLE']}),
-P('b-design','调整岗位，还是再加一个指标？','组织设计',4,[
-'<p>如果一个人兼顾两项相互替代的任务，管理者有几种不同的选择：改善难测任务的测量；降低易测任务的奖金；把任务交给不同岗位；为质量设置可验证门槛。</p>',
-tbl(['做法','模型里改变了什么','必须另查什么'],[['提高质量信号精度','降低相应噪声方差','采集和审核信息的成本'],['降低数量奖金','改变奖金向量 $b$','总努力是否因此下降'],['拆分岗位','改变个人承担的任务及成本联系','交接和协调成本'],['质量门槛','增加可执行约束或改变支付函数','质量是否真的能核实']]),
-'<p>这里没有免费方案。任务分开可能减少一个人内部的努力挤出，却增加两人之间的沟通成本和责任划分问题。不能只计算奖金带来的收益，遗漏重新组织工作产生的代价。</p>',
-box('<strong>教学构造：设备维修</strong><p>若当月只奖励结单数，复检可能被减少。可以比较：由另一岗位独立复检；把返修记录纳入延迟考核；降低单量奖金。选择哪种需要故障风险、测量精度和协调成本资料，单靠理论不能替代调查。</p>'),
-'<p>把这个思路记为一条顺序：完整任务表 → 测量表 → 任务联系 → 激励方案 → 组织调整的额外成本。</p>'
-],{refs:['HM91'],note:'为你在开章选的岗位设计两种方案。各写一个行为收益和一个新增成本。'}),
-P('b-check','章末题：不要把挤出当作口号','章末检验',6,[
-'<p>用公式和条件回答。若只记住“考核会扭曲行为”，还不足以完成本章。</p>',
-det('纸笔题：核对推导','<p>给定 $b_1=b_2=1,@rho=0.5$，先解两项努力；再把 $b_1$ 增加 0.15。答案：初始两项都是 $2/3$；变化后 $e_1=13/15@approx0.8667$，$e_2=17/30@approx0.5667$。交叉效应预测 $@Delta e_2=(-2/3)@times0.15=-0.1$，与直接计算一致。</p>'),
-box('<strong>迁移任务</strong><p>一个客服部门奖励通话次数。提出三种可能导致客户满意度下降的机制，然后指出哪种属于本章的任务分配机制。区分机制，才能知道应修改哪个制度。</p>'),
-det('迁移题参考','<p>可能机制包括：员工减少每通电话的解释时间；新增客户问题本身更复杂；满意度调查样本发生变化。只有第一种直接对应固定时间下任务分配。后两种分别涉及环境变化和测量，不应仅靠调整奖金来解释。</p>')
-],{refs:['HM91','DUKE'],quiz:[
-Q('b-end1','若两任务成本可分且噪声独立，提高任务 1 奖金是否必然降低任务 2 努力？',['必然降低','不必；本模型交叉效应为零','必然提高','模型无法求解'],1,'可分成本意味着 $@rho=0$。任务 2 的最优努力只取决于自己的奖金。'),
-Q('b-end2','内点公式给出负的质量努力，正确做法是什么？',['把负值解释为破坏行为','继续使用原斜率','检查非负约束并求角点','删除质量任务'],2,'负努力不在设定的可行集中。应使用边界最优条件，而不是事后编造行为解释。'),
-Q('b-end3','“难测任务重要，所以零绩效工资总是最佳”有什么问题？',['没有问题','遗漏任务关系、其他动机和总努力反应','只需要增加固定工资即可证明','只要任务重要就足够'],1,'弱激励的合理性有条件。如果没有其他动机，零奖金可能导致零努力。应把完整行为机制写入模型。')
-]}),
-P('b-takeaway','公式卡 02｜总量与方向分开看','提取与记忆',3,[
-eq('e=H^{-1}b,@qquad @frac{@partial e_2}{@partial b_1}=-@frac{@rho}{1-@rho^2}'),
-eq('b^*=(I+rH@Sigma)^{-1}v@quad@text{（内点）}'),
-'<p><strong>核心思想：</strong>奖金改变努力总量，也改变努力方向。替代任务的测量不均衡，可能使易计量指标得到过多努力。</p>',
-'<p><strong>可执行的检查：</strong>完整任务是什么？各项的私人回报从哪里来？两项成本是否相互影响？哪个信号噪声大？是否碰到零努力或时间上限？</p>',
-'<p><strong>适用条件：</strong>交叉导数公式来自正定二次成本和内点；最优奖金矩阵式还依赖 CARA、联合正态、线性合同、自由转移与风险中性委托人。</p>',
-box('<strong>两天后不看答案重建</strong><p>从两条一阶条件消去一个未知数。再举一个 $@rho=0$ 的反例，说明加奖为什么未必挤出另一任务。</p>','green')
-],{refs:['HM91','DUKE'],memory:{question:'什么条件下，提高任务 1 奖金会挤出任务 2 努力？',answer:'二次成本内点中，$@partial e_2/@partial b_1=-@rho/(1-@rho^2)$。私人边际成本替代 $@rho&gt;0$ 时为负；$@rho=0$ 时为零；互补时为正。碰到非负边界后须重新求解。'}})
-]});
-chapters.push({id:'teams',number:'03',title:'团队：共同产出与个人激励',short:'分完所有收入，为什么仍有缺口',duration:'30–45 分钟',pages:[
-P('c-question','所有人都受益，为什么努力仍不足？','提出问题',3,[
-'<p class="lead">四个人共同完成一个项目。只知道项目总产出，无法核实每个人付出了多少。收入平均分配。每个人会愿意付出使团队总收益最大的努力吗？</p>',
-'<p>不需要假定任何人不讲道德。只要个人承担全部努力成本，却只能拿到增加产出的一部分，就会出现私人边际收益与团队边际收益的差别。</p>',
-'<p>我们先算等分收入的例子，再问更难的问题：不平均分，能否设计出既分完所有产出、又让每个人都选择第一最佳努力的规则？</p>',
-box('<strong>本章目标</strong><p>区分总剩余与个人收益；独立求出团队纳什均衡；理解预算平衡与边际激励为何可能冲突。</p>','green'),
-'<p>本章的团队成员目标可能不同于第六主题“团队决策理论”中的共同目标。这里每个成员最大化自己的收益，正是这个差别产生了激励问题。</p>'
-],{refs:['H82','STOLE'],note:'先预测：从 2 人增加到 4 人，等分收入下每人的努力和总产出分别怎样变化？'}),
-P('c-model','一个能手算的团队','模型假设',3,[
-'<p>团队有 $n$ 名风险中性成员，产出不含噪声，只取决于努力之和。单位产出价值为 1。成员同时选择努力，各自承担二次成本。</p>',
-eq('Q=@sum_{i=1}^n e_i,@qquad C_i=@frac c2e_i^2,@qquad e_i@ge0'),
-'<p>先考虑线性分成：成员 $i$ 获得比例 $s_i$ 的总产出，各比例非负且总和为 1。无论产出多少，团队成员都将它全部分完。</p>',
-eq('u_i=s_iQ-@frac c2e_i^2,@qquad s_i@ge0,@quad @sum_i s_i=1'),
-'<p>努力不可直接写入合同；没有可核实的个人绩效，没有成员间的约束性努力协议，也没有以后合作的收益。成员只根据自己的份额选行动。</p>',
-box('<strong>这些简化有什么用途？</strong><p>没有噪声，仍然可能产生激励不足。这样可以把团队搭便车与第一章的风险保险问题区分开。</p>'),
-'<p>$s_i$ 在本章表示比例。稍后一般分享规则写作 $T_i(Q)$，避免把常数比例和随产出变化的支付函数混淆。</p>'
-],{refs:['H82']}),
-P('c-benchmark','总收益最大，要求每人做多少？','第一最佳',3,[
-'<p>先由一个只关心总净剩余的决策者选择所有努力。转移支付在团队内部抵消，目标为：</p>',
-eq('@max_{e_1,@ldots,e_n@ge0}@; W=@sum_i e_i-@sum_i@frac c2e_i^2'),
-'<p>对每个成员的努力求偏导：</p>',
-eq('@frac{@partial W}{@partial e_i}=1-ce_i=0@quad@Rightarrow@quad e_i^{FB}=@frac1c'),
-eq('Q^{FB}=@frac nc,@qquad W^{FB}=@frac n{2c}'),
-'<p>每个人增加一点努力，都为整个团队增加 1 单位产出。因此第一最佳要求每个人把自己的边际努力成本推到 1。</p>',
-'<p>这个基准并未考虑如何付钱才能让所有人自己愿意这样做。它只说明需要实施的目标，下一页才检查私人选择。</p>',
-det('数值核对','<p>若 $n=4,c=1$，每人努力 1，总产出 4，总成本 2，总净剩余 2。收入怎么在四个人之间分配，不改变这个总量，但会影响他们愿意选择什么行动。</p>')
-],{refs:['H82','STOLE']}),
-P('c-nash','每人只拿到一部分边际产出','纳什均衡',4,[
-'<p>成员 $i$ 把其他人的努力视为给定，只改变自己的 $e_i$：</p>',
-eq('@max_{e_i@ge0}@;s_i(e_i+@sum_{j@ne i}e_j)-@frac c2e_i^2'),
-eq('s_i-ce_i=0@quad@Rightarrow@quad e_i^{NE}=@frac{s_i}{c}'),
-'<p>NE 是 Nash equilibrium。因为每个人的最优反应在此例中不依赖别人的努力，把这些选择放在一起就得到唯一纳什均衡。</p>',
-eq('s_i=@frac1n@quad@Rightarrow@quad @boxed{e_i^{NE}=@frac1{nc}},@qquad @frac{e_i^{NE}}{e_i^{FB}}=@frac1n'),
-'<p>个人付出努力的全部成本，却只获得 $1/n$ 的边际收入。其余部分流向同伴，形成没有被个人选择计入的外部收益。</p>',
-'<p>当所有线性份额加总为 1 时，总努力 $Q^{NE}=@sum_i s_i/c=1/c$。在这个对称生产率与成本例子中，换一种分成比例并不能提高总努力，只会改变谁做更多。</p>',
-box('<strong>先区分分配与效率</strong><p>某人分得更多，可能更努力；这不等于整个团队就更有效率。必须把所有人的变化加起来。</p>','green')
-],{refs:['H82'],quiz:[N('c-nash-n','若 $n=5,c=2$ 且收入等分，每人的均衡努力是多少？',.1,.001,'$e_i=1/(nc)=1/10=0.1$；第一最佳为 $1/c=0.5$。')]}),
-P('c-lab','实验：人数翻倍，什么保持不变？','参数实验',5,[
-'<p>按等分收入比较纳什均衡与第一最佳。这里每个新成员具有同样的生产率和成本，模型没有增加协调负担，也没有规模技术收益。</p>',
-'<div data-lab="team"></div>',
-'<ol><li>把人数从 2 调到 8。检查每人努力、总产出、总净剩余。</li><li>改变成本系数。两种制度下的努力是否按相同比例变化？</li><li>解释为什么总产出不变，但总净剩余会变化。</li></ol>',
-det('为什么等分下人数增加，总剩余仍可能增加？','<p>本模型中总产出固定为 $1/c$，等分均衡的总成本为 $1/(2nc)$，总净剩余是 $1/c-1/(2nc)$。更多人把相同产出分摊到更小的个人努力上，凸成本下降。但第一最佳随人数线性增加，因此两者的相对效率差距仍在扩大。这不支持“人数越多越差”的简单口号。</p>'),
-box('<strong>模型的可检验部分</strong><p>“人数增加时，每人努力减少”是这里的比较静态。真实团队还可能出现分工、互补、学习和协调成本；要据此判断团队规模，必须扩展模型。</p>')
-],{refs:['H82'],note:'用“个人努力、总产出、总剩余、相对效率”四个量，各写一句人数变化的结果。'}),
-P('c-general','不平均分，能不能解决？','从例子到命题',4,[
-'<p>等分收入只是一个支付方案。它失败，不代表所有方案都失败。现在允许成员的支付是任意光滑函数 $T_i(Q)$，仍然只依据共同产出。</p>',
-eq('@sum_{i=1}^n T_i(Q)=Q@qquad@text{对每一个可行 }Q'),
-'<p>这叫逐状态预算平衡：每种产出下都恰好把产出分完。它比“平均来说收支相抵”更严格。此处没有外部主体向团队补贴，也不能扣住部分产出。</p>',
-'<p>我们要问：在 $n&gt;1$、第一最佳努力为正的内点，是否存在这种支付规则，使每个成员各自最优选择都恰好等于第一最佳？</p>',
-box('<strong>本讲将证明的范围</strong><p>连续努力、可分凸成本、严格递增且凹的共同产出、风险中性、非合作选择、只有共同产出可契约、光滑支付规则、逐状态预算平衡。原论文另有更一般的结果；下面的求导证明只覆盖光滑版本。</p>'),
-'<p>明确范围后，结论才可以准确使用。它不是对所有团队、所有激励或所有合作关系的否定。</p>'
-],{refs:['H82','BORDER']}),
-P('c-proof','两行边际条件里的矛盾','核心证明',5,[
-'<p>写一般生产函数 $Q(e_1,@ldots,e_n)$，其对成员 $i$ 努力的偏导为 $Q_i&gt;0$。第一最佳的内点条件是：</p>',
-eq('Q_i=C_i^{@prime}(e_i)'),
-'<p>成员获得 $T_i(Q)$，自己的激励相容条件是：</p>',
-eq('T_i^{@prime}(Q)Q_i=C_i^{@prime}(e_i)'),
-'<p>若要在第一最佳同时成立，因为 $Q_i&gt;0$，每个成员都必须满足 $T_i^{@prime}(Q)=1$：每人都要拿到全部边际产出。可是预算平衡对 $Q$ 求导给出：</p>',
-eq('@sum_iT_i^{@prime}(Q)=1'),
-eq('@underbrace{1+1+@cdots+1}_{n@text{ 个}}=1@quad@text{不可能在 }n&gt;1@text{ 时成立}'),
-'<p>由此可知，在上述条件下，无法用光滑、逐状态预算平衡的共同产出支付规则实施内点第一最佳。矛盾发生在<strong>边际激励的总和</strong>，而非固定工资的总量。</p>',
-box('<strong>理解检验</strong><p>给每个人额外发一笔与产出无关的固定奖金，会改变 $T_i^{@prime}(Q)$ 吗？若不改变，它为什么不能消除这个矛盾？</p>','green')
-],{refs:['H82','BORDER'],quiz:[Q('c-proof-q','上述矛盾最直接来自哪两件事？',['每人要全部边际收益，而全部边际收益只能分一次','团队成员都厌恶风险','公司看不到总产出','努力必须离散'],0,'第一最佳要求每个有效成员的边际支付斜率为 1，逐状态预算平衡却要求这些斜率相加为 1。')]}),
-P('c-principal','为什么外部预算执行者可能有用？','放松条件',4,[
-'<p>要改变结论，需要改变证明中的条件。一个途径是引入能承诺执行规则的外部主体，使团队成员所得不必在每种产出下恰好等于总产出。</p>',
-'<p>外部执行者可以扣留未达要求时的部分产出，或在某些状态补贴。这样，成员边际支付的总和不再被强制等于 1，前页矛盾的关键一步不成立。</p>',
-'<p>在确定性环境中，还可构造达到目标产出才支付固定奖励的阈值规则。它改变偏离目标时的收益，使目标努力可能成为一个纳什均衡。</p>',
-box('<strong>存在一个有效均衡，不等于所有均衡都有效</strong><p>阈值方案可能还存在低努力均衡，也依赖执行者可信承诺。若产出有噪声，未达标未必来自偷懒；风险和误罚又会进入问题。</p>'),
-'<p>因此，经理或所有者在这种理论中的一种可能作用，是执行无法由成员自己逐状态分完产出的激励预算。它不只是“监督大家是否认真”。</p>',
-'<p>这是一种组织存在的机制解释，不是声称每个现实组织的管理者都承担了同样功能。</p>'
-],{refs:['H82','STOLE']}),
-P('c-remedies','其他制度改变了哪条条件？','迁移应用',4,[
-tbl(['制度或条件','它可能改变什么','仍需检查'],[['可核实的个人绩效','支付不再只依赖共同产出','测量成本与多任务扭曲'],['成员能有效监督并实施奖惩','个人行动可被其他制度约束','监督本身是否可信、有成本'],['持续合作与未来回报','不再是一次性博弈','未来是否足够重要、惩罚能否执行'],['外部预算执行者','放松逐状态预算平衡','承诺、预算与执行者自身激励'],['离散且可协调的行动','内点微分证明不再直接适用','需要重新求解，不能据此直接断言有效']]),
-'<p>这张表是机制对照，不是说每种改变都自动达到第一最佳。去掉一个不可能性定理的条件，只表示原证明不能直接用；还需要构造并检验新的制度。</p>',
-box('<strong>教学构造：研发小组</strong><p>若研究产出只能共同认定，个人奖金分配就面临归因难题。引入可审查的过程记录可能增加信息，也可能让成员追逐记录数量。把第三章的激励缺口和第二章的测量偏移同时写出来，分析会更完整。</p>'),
-'<p>实际分析时，先指出哪条约束被改变，再说明个人最优反应如何变化。仅写“加强管理”“提升协同”，不足以构成机制解释。</p>'
-],{refs:['H82','STOLE','HM91'],note:'给你熟悉的团队提出一个制度变化。指出它放松了证明中的哪条假设，以及新增什么问题。'}),
-P('c-check','章末题：均衡可以稳定，也可以低效','章末检验',6,[
-'<p>尝试在纸上从个人目标重推一次 $e_i=s_i/c$，再从预算平衡重建两行证明。下面的问题分别检验数值、逻辑与范围。</p>',
-det('开放题：两人团队改成九一分成会更有效吗？','<p>在本章同成本、线性加总产出、风险中性的例子中，努力从 $(0.5/c,0.5/c)$ 变为 $(0.9/c,0.1/c)$，总产出仍为 $1/c$。但因成本凸且成员相同，努力更不均衡反而提高总成本：成本从 $0.25/c$ 变为 $0.41/c$。所以等分在这类固定份额制度中最大化总净剩余，却仍达不到第一最佳。</p>'),
-box('<strong>可带走的反例</strong><p>“让最积极的人拿更多就会提高团队效率”缺少条件。即使一人的努力上升，也可能以另一个人的努力下降和更高总成本为代价。</p>','green')
-],{refs:['H82','BORDER'],quiz:[
-N('c-end-n','两人团队 $c=1$，分成 $(0.9,0.1)$ 时的总努力成本是多少？',.41,.001,'两人的努力分别为 0.9 和 0.1。成本为 $(0.9^2+0.1^2)/2=0.41$。'),
-Q('c-end-q1','只证明等分收入不能实施第一最佳，是否足以证明所有支付规则都不行？',['足以','不足；还需分析更一般分享规则','如果人数超过 3 就足以','只要成员风险中性就足以'],1,'一个方案失败不是不可能性证明。需要把所有允许的支付规则共同受到的限制写出来。'),
-Q('c-end-q2','用额外的固定工资补偿成员，能否直接解决两行证明中的边际矛盾？',['能，因为收入提高','不能，固定转移不改变边际斜率','必然能，若工资足够高','只有人数为 2 时能'],1,'在本章准线性效用下，固定工资不会改变个人多做一点努力的回报。')
-]}),
-P('c-takeaway','公式卡 03｜谁得到最后一单位产出？','提取与记忆',3,[
-eq('e_i^{NE}=@frac{s_i}{c},@qquad e_i^{FB}=@frac1c'),
-eq('@text{等分：}@quad e_i^{NE}=@frac1{nc},@quad Q^{NE}=@frac1c'),
-eq('@text{第一最佳要求 }T_i^{@prime}=1;@qquad@text{预算要求 }@sum_iT_i^{@prime}=1'),
-'<p><strong>核心思想：</strong>共同产出的边际收益被多人分享，个人却承担全部努力成本。若人人都要完整边际激励，逐状态分完同一份产出的约束可能使目标无法实施。</p>',
-'<p><strong>可执行的检查：</strong>个人贡献能否核实？收入依赖什么信号？每多一单位努力，个人获得多少？是否有可信的外部预算或未来约束？</p>',
-'<p><strong>范围：</strong>等分公式来自本章同质、加总、二次成本例子；不可能性证明另有连续内点、共同产出支付、光滑、一次性非合作及逐状态预算平衡等条件。</p>',
-box('<strong>两天后不看答案重建</strong><p>写出私人一阶条件与社会一阶条件。再解释为何提高固定工资无法修复它们之间的边际差距。</p>','green')
-],{refs:['H82','BORDER'],memory:{question:'为什么逐状态预算平衡可能与团队第一最佳激励冲突？',answer:'光滑支付规则下，第一最佳与个人 IC 要求每个有效成员的边际支付 $T_i^{@prime}(Q)=1$；逐状态预算平衡要求所有边际支付加总为 1。$n&gt;1$ 时矛盾。结论有明确的连续、内点、共同产出等条件。'}})
-]});
-chapters.push({id:'ownership',number:'04',title:'产权：控制权为什么影响投资',short:'事后议价与事前投入',duration:'40–55 分钟',pages:[
-P('d-question','既然事后可以谈，为什么事前还需要产权？','提出问题',3,[
-'<p class="lead">一家设计公司与一家加工厂合作。设计师先投入工艺适配，加工方先投入技能学习。到了交易时，投入已经无法收回，双方却还要重新谈价格。</p>',
-'<p>只要谈判能实现合作，当期交易可能仍然有效率。但双方预期自己拿不到全部投资回报，事前就可能投入不足。产权理论把这种时间上的联系放在中心。</p>',
-'<p>本章先区分观察与验证，再用两阶段模型计算：资产归谁 → 不合作时能做什么 → 事后如何分配 → 事前愿意投多少。</p>',
-box('<strong>本章目标</strong><p>能解释剩余控制权，推导对称 Nash 议价的收益分配，计算两种所有权下的投资和总剩余，并指出为何整合不能自动消除激励问题。</p>','green'),
-'<p>设计公司与加工厂是贯穿本章的教学情境。函数和参数为自行构造，用于展示 Grossman–Hart 产权机制，不能把它当作原论文模型或实际并购案例。</p>'
-],{refs:['GH86','HART'],note:'先预测：若双方的投入都重要，把资产全部给一方，另一方的投资会怎样变化？'}),
-P('d-contract','不完全，不只是“合同写得不够长”','概念与假设',4,[
-'<p>可观察：交易双方知道某件事发生了。可验证：第三方能够依据证据确认它，以执行合同。两者不相同。双方知道一次工艺改进有帮助，不代表法院能低成本核定它的具体质量和贡献。</p>',
-tbl(['情况','可否直接写入可执行支付条款？','模型含义'],[['可观察且可验证','通常可以，仍需考虑成本','可能按具体结果或行动签约'],['双方可观察但第三方不可验证','不能简单依赖该变量执行','可能需要事后谈判与控制权'],['只有一方知道','还存在私人信息问题','需要额外的信息与激励分析']]),
-'<p>产权理论关注非人力资产的剩余控制权：合同没有具体规定的用途，由谁决定。拥有设备不等于拥有操作它的人，也不等于可以强迫对方提供人力投入。</p>',
-'<p>整合将资产的控制权集中到一方，改变双方退出合作时可使用的资产和收益，从而改变投资的回报。它不必使所有事后争议消失。</p>',
-box('<strong>这里采用的不完全契约设定</strong><p>事前无法把特定投入写入可执行合同；事后双方能观察相关价值并有效率地议价。我们不在本章进一步推导“为什么所有复杂机制都无法补全合同”。这个限制是模型设定，需要意识到它。</p>')
-],{refs:['HART','AH11','MITBOUND']}),
-P('d-timing','把沉没投资放在谈判之前','模型时序',4,[
-'<div class="diagram"><div><b>0 确定产权</b>约定谁拥有资产，以及固定转移</div><div class="arrow">→</div><div><b>1 作投资</b>双方投入人力，支出不可收回</div><div class="arrow">→</div><div><b>2 谈交易</b>观察价值，决定合作与分配</div></div>',
-'<p>买方 B 投入 $i@ge0$，卖方 S 投入 $j@ge0$，各自成本为 $i^2/2,j^2/2$。合作创造总价值：</p>',
-eq('V(i,j)=Ai+Bj,@qquad A,B&gt;0'),
-'<p>这里大写 $A,B$ 是两种投资的生产率参数；下标 B、S 表示买卖双方，二者不要混淆。资产所有权只在本教学模型中改变退出合作时的收益，不改变合作技术 $V$。</p>',
-'<p>双方风险中性，效用可转移，没有财富约束；事前固定转移不随投资变化。双方预见未来的对称 Nash 议价，但无法事前承诺针对不可契约投入的支付。</p>',
-box('<strong>倒着求解</strong><p>先解阶段 2 的分配，再回到阶段 1 求投资，最后比较阶段 0 的产权。这个方法叫逆向归纳。</p>','green')
-],{refs:['GH86','PRINCETON']}),
-P('d-nash','谈判分的是“超过不合作的剩余”','数学补充',5,[
-'<p>令 $d_B,d_S$ 为双方不合作时的收益。若 $V@ge d_B+d_S$，合作有非负额外收益。对称 Nash 议价让双方相对于不合作状态的增益乘积最大：</p>',
-eq('@max_{@pi_B+@pi_S=V}@;(@pi_B-d_B)(@pi_S-d_S)'),
-'<p>将 $@pi_S=V-@pi_B$ 代入，求导得到 $V-2@pi_B+d_B-d_S=0$，因此：</p>',
-eq('@boxed{@pi_B=d_B+@frac12(V-d_B-d_S)}'),
-eq('@boxed{@pi_S=d_S+@frac12(V-d_B-d_S)}'),
-'<p>双方各保留不合作收益，再平分合作带来的增量。这不是简单的“总收入各半”：只有 $d_B=d_S$ 时才各得 $V/2$。</p>',
-'<p>这里的 $@pi$ 尚未扣除事前投入成本。谈判时成本已经沉没，在合作和不合作两种选择中都已发生；求事前投资时则必须扣掉。</p>',
-det('一组数值','<p>若 $V=10,d_B=4,d_S=2$，新增合作收益是 4，双方各得增量 2。故买方得 6，卖方得 4。不是把 10 简单平分，也不是让买方仅拿不合作收益 4。</p>'),
-box('<strong>关于外部选项的范围</strong><p>本模型将 $d_B,d_S$ 设为 Nash 议价中的不合作收益；其他动态谈判协议对“外部选项”的处理可能不同，不能不加说明地互换。</p>')
-],{refs:['PRINCETON'],quiz:[N('d-nash-n','若 $V=12,d_B=4,d_S=2$，对称 Nash 议价下买方收入是多少？',7,.001,'合作增量为 $12-4-2=6$，买方收入为 $4+6/2=7$，尚未扣投资成本。')]}),
-P('d-threat','产权怎样进入外部收益？','教学模型',4,[
-'<p>设 $@theta@in[0,1]$ 是资产所有者在不合作时保留自身投资贡献的比例。非所有者离开资产后无法在本模型中利用这项投入。</p>',
-tbl(['资产归谁','买方不合作收益 $d_B$','卖方不合作收益 $d_S$'],[['买方 B','$@theta Ai$','0'],['卖方 S','0','$@theta Bj$']]),
-'<p>$@theta$ 是可回收程度，不是议价权重。议价仍然对称，各拿新增合作剩余的一半。产权通过改变不合作时能保留的收益，间接改变投资激励。</p>',
-'<p>因为 $0@le@theta@le1$，总不合作价值不超过 $V=Ai+Bj$，因此本例始终存在非负合作增量。投资越有用、产权使越多贡献可在退出后保留，所有者的投资边际回报就越大。</p>',
-box('<strong>明确的简化</strong><p>现实中产权可能影响双方的多种外部收益、资产互补和技术效率。本例只保留“所有者可回收自身投资一部分”的渠道，以便手算；不是一般产权定理。</p>'),
-'<p>下一步应计算收入对投资的导数。只看到所有者事后拿得更多，还不能说明他会投得更多。</p>'
-],{refs:['GH86','HART','PRINCETON']}),
-P('d-invest','从事后分配回到事前投资','核心推导',5,[
-'<p><strong>买方拥有资产。</strong>代入 $d_B=@theta Ai,d_S=0$，买方的事前净收益为：</p>',
-eq('u_B=@frac{1+@theta}{2}Ai+@frac12Bj-@frac12i^2'),
-'<p>对 $i$ 求导；卖方同样对自己的 $j$ 求导：</p>',
-eq('@boxed{i_B^*=@frac{1+@theta}{2}A},@qquad @boxed{j_B^*=@frac12B}'),
-'<p><strong>卖方拥有资产。</strong>交换不合作收益的设定，得到：</p>',
-eq('@boxed{i_S^*=@frac12A},@qquad @boxed{j_S^*=@frac{1+@theta}{2}B}'),
-'<p>第一最佳由最大化 $Ai+Bj-(i^2+j^2)/2$ 得到 $i^{FB}=A,j^{FB}=B$。没有所有权的一方只能拿到自身投资创造价值的一半，因此投资低于基准。</p>',
-'<p>当 $@theta&lt;1$ 时，所有者通常也投资不足。即使 $@theta=1$ 让所有者达到自己的第一最佳，另一方仍只投到一半。</p>',
-box('<strong>核心机制</strong><p>改变产权，改变不合作收益随投资增加的幅度；改变这个幅度，才改变事前投资的边际回报。</p>','green')
-],{refs:['GH86','PRINCETON'],quiz:[N('d-invest-n','若 $A=2,B=1,@theta=0.6$ 且买方拥有，买方投资是多少？',1.6,.001,'$i_B^*=A(1+@theta)/2=2@times1.6/2=1.6$。卖方投资为 0.5。')]}),
-P('d-surplus','比较所有权，要看双方净剩余','制度比较',5,[
-'<p>固定转移可以改变谁最后拿到多少，却不能改变可分配的总量。比较制度效率时，计算合作价值减双方真实投资成本：</p>',
-eq('W=Ai+Bj-@frac12(i^2+j^2)'),
-'<p>把上页两种产权下的投资代入，记为 $W_B,W_S$，化简得到：</p>',
-eq('@boxed{W_B-W_S=@frac{@theta(2-@theta)}8(A^2-B^2)}'),
-'<p>在这个特例中，$@theta&gt;0$ 时，若买方投资的生产率 $A$ 高于卖方的 $B$，资产归买方的总净剩余更高。产权改善哪种投资的激励，是比较的关键。</p>',
-det('差值怎么化简？','<p>对生产率 $x$，无产权时投入 $x/2$，净贡献为 $3x^2/8$。有产权时投入 $(1+@theta)x/2$，净贡献为 $(3+2@theta-@theta^2)x^2/8$。产权改善该项贡献的幅度为 $@theta(2-@theta)x^2/8$；两项相减得到上式。</p>'),
-box('<strong>不能推广成哪句话？</strong><p>不能据此说“谁投入最多，资产永远归谁”。这里比较的是给定技术、成本与外部收益设定下的投资生产率。互补关系、资产结构、替代用途和可契约程度变化，都可能改变结论。</p>')
-],{refs:['GH86','AH11'],note:'若 $A=B$，为什么两种所有权的总剩余相等，但投资分配不同？'}),
-P('d-lab','实验：给谁资产，谁就更愿意投入？','参数实验',5,[
-'<p>改变两种投资的生产率与资产的可回收程度。切换所有者，观察双方投资；图中同时比较两种产权下的总净剩余与第一最佳。</p>',
-'<div data-lab="ownership"></div>',
-'<ol><li>令 $A=2,B=1,@theta=0.6$，核对买方拥有时 $i=1.6,j=0.5,W=2.295$。</li><li>把 $@theta$ 降到零。产权还影响投资吗？</li><li>把生产率大小对调。什么发生反转，什么仍未达到第一最佳？</li></ol>',
-'<p>所有曲线都由本章教学模型计算。资产价格是双方之间的转移，未加入总剩余；交易、融资、治理等真实成本也暂未加入。</p>',
-det('这组数值如何比较？','<p>默认参数下，卖方拥有时 $i=1,j=0.8,W=1.98$；买方拥有比卖方拥有多 $0.315$。第一最佳为 $(A^2+B^2)/2=2.5$，较优产权仍有损失。$@theta=0$ 时两种产权都给出 $i=A/2,j=B/2$，没有激励差别。</p>')
-],{refs:['GH86','PRINCETON'],note:'记录一次“产权改变但事后合作技术不变”的实验。说明效率变化来自哪里。'}),
-P('d-margin','外部收益更高，不一定投资更多','一个应记住的区别',4,[
-'<p>考虑一般的合作价值与不合作收益。买方事前最大化 $@pi_B(i,j)-C_B(i)$，一阶条件是：</p>',
-eq('C_B^{@prime}(i)=@frac12@left(V_i+d_{B,i}-d_{S,i}@right)'),
-'<p>下标 $i$ 表示对买方投资的偏导。产权是否改善投资，取决于它如何改变这些<strong>边际量</strong>，不只取决于收入水平。</p>',
-'<p>假设买方不合作收益增加一个与投资无关的常数 $K$，且仍有合作增量。买方事后收入提高 $K/2$，但 $d_{B,i}$ 没变，因此这里的最优投资不变。</p>',
-'<p>若产权使 $d_B$ 从 0 变为 $@theta Ai$，则 $d_{B,i}$ 从 0 变为 $@theta A$，边际回报提高，才会改变投资。</p>',
-box('<strong>分析一项控制权时</strong><p>不要只问“谁能多拿钱”。要问“多做一单位不可契约投入，谁能多拿多少钱”。把水平与边际分开，才能解释行为。</p>','green'),
-det('为什么另一方的外部收益也在导数里？','<p>如果买方投入还提高卖方不合作收益，卖方在谈判中的保留所得也增加。买方未必能拿到全部新增合作价值。一般边际式中的 $-d_{S,i}$ 正是这个渠道。</p>')
-],{refs:['PRINCETON','GH86'],quiz:[Q('d-margin-q','买方外部收益提高一个与投资无关的固定金额，能否由此断定其投资增加？',['能，收入提高必然增加投资','不能；要看外部收益对投资的导数','只有固定金额足够大时必然增加','本模型没有导数'],1,'在风险中性、自由转移、给定议价机制和合作仍可行的设定下，固定金额不改变边际投资回报。')]}),
-P('d-boundary','整合的收益，伴随着另一方的激励变化','应用与边界',4,[
-'<p>产权转移可能提高所有者的投入，却降低原所有者的投入。因此企业边界不是“整合越多越好”，而是比较不同控制权配置下双方行为和总剩余。</p>',
-tbl(['需要调查的问题','对应模型变量或假设'],[['哪些关键投入难以事前核实？','$i,j$ 的不可契约性'],['不合作时谁仍能利用资产与技能？','$d_B,d_S$'],['产权如何改变投入的边际回报？','$d_{B,i},d_{S,i}$ 等'],['双方能否事后有效率地谈成合作？','Nash 议价与效率假设'],['收购是否带来真实新增成本？','应加入 $W$ 的治理、融资或协调成本']]),
-'<p>所有权不等于消灭人力资本的独立性。若关键技能在某个人身上，购买设备仍不能保证他提供努力；薪酬、授权与持续关系的问题还在。</p>',
-'<p>事前收购价格可以分配产权安排创造的剩余，在本模型中不改变边际投资激励；若存在财富限制，价格与融资可能反过来约束可行安排。</p>',
-box('<strong>应用任务</strong><p>为设计公司与加工厂各写一项不可契约投入，再写两种所有权下的不合作用途。只有把这些用途说具体，才有依据判断产权的激励作用。</p>')
-],{refs:['HART','MITBOUND','AH11'],note:'举一个“拥有资产仍无法命令对方投入技能”的例子。'}),
-P('d-check','章末题：把时间顺序和边际回报说清楚','章末检验',7,[
-'<p>先独立完成，再展开核对。应能从收益分配推回投资，而不只是复述产权定义。</p>',
-det('纸笔题：$A=1,B=2,@theta=0.5$，哪种产权更有效率？','<p>买方拥有：$i=0.75,j=1$，$W=2.75-(0.5625+1)/2=1.96875$。卖方拥有：$i=0.5,j=1.5$，$W=3.5-(0.25+2.25)/2=2.25$。卖方拥有更高，差值为 0.28125。第一最佳为 2.5；较优制度仍未达到。</p>'),
-box('<strong>迁移任务</strong><p>假设你要比较自建生产与长期供应合同。写四句：不可契约投入是什么；不同产权如何影响不合作用途；双方各会怎样调整投入；还遗漏了哪些真实成本。不要仅凭“可控性更强”下结论。</p>','green')
-],{refs:['GH86','PRINCETON','AH11'],quiz:[
-Q('d-end1','事后交易有效率，能否保证事前投资有效率？',['能，只要最后合作','不能；投资回报可能被事后分享','只要双方风险中性就能','只要没有噪声就能'],1,'事后有效率解决给定投资下是否合作；事前投资取决于预期拿到多少边际收益。两个阶段不同。'),
-Q('d-end2','本章的资产所有权最准确指什么？',['对所有员工的人力资本所有权','合同未规定用途上的剩余控制权','所有未来收益必然全部归所有者','让合同变得完全'],1,'产权针对非人力资产未约定的使用权。合作仍可能需要另一方的人力投入与事后谈判。'),
-N('d-end3','若 $A=2,B=1,@theta=1$ 且买方拥有，总剩余是多少？',2.375,.001,'投资为 $i=2,j=0.5$。价值为 4.5，成本为 $(4+0.25)/2=2.125$，总剩余 2.375，仍低于第一最佳 2.5。')
-]}),
-P('d-takeaway','公式卡 04｜产权改变退出后的回报','提取与记忆',3,[
-eq('@pi_B=d_B+@frac{V-d_B-d_S}{2}'),
-eq('C_B^{@prime}(i)=@frac{V_i+d_{B,i}-d_{S,i}}2'),
-eq('i_B^*=@frac{1+@theta}{2}A,@qquad j_B^*=@frac B2@quad@text{（本章特例）}'),
-'<p><strong>核心思想：</strong>不可契约投入发生在谈判之前。产权改变退出合作后可获得的回报，进而改变投资的私人边际收益。事后有效率仍可能伴随事前投资不足。</p>',
-'<p><strong>可执行的分析顺序：</strong>识别不可契约投入 → 写不合作收益 → 写议价分配 → 求个人投资 → 比较净剩余 → 加入遗漏的真实成本。</p>',
-'<p><strong>适用条件：</strong>本章数值模型是线性合作价值、二次投资成本、可回收自身贡献、对称 Nash 议价、风险中性、无财富约束的教学特例；不能把“给生产率较高者”当作一般产权法则。</p>',
-box('<strong>两天后不看答案重建</strong><p>先解释 $d_B$ 增加常数与 $d_{B,i}$ 增加的区别，再从 $@pi_B$ 推一次投资一阶条件。</p>','green')
-],{refs:['GH86','HART','PRINCETON'],memory:{question:'产权如何通过事后谈判影响事前投资？',answer:'产权改变不合作收益及其对投资的边际反应。对称 Nash 下 $C_B^{@prime}=(V_i+d_{B,i}-d_{S,i})/2$。只提高固定外部收益未必增加投资；关键是边际回报。事后合作有效率也不保证事前投资足够。'}})
-]});
-chapters.push({id:'synthesis',number:'05',title:'回看四章',short:'综合练习与文献',duration:'15–20 分钟',pages:[
-P('s-map','四种制度，同一条分析链','综合',4,[
-tbl(['主题','私人回报与组织目标的差别','模型中的关键约束','可带走的动作'],[['委托—代理','员工承担风险，公司重视产出','隐藏努力、噪声与风险厌恶','先区分可控绩效与共同冲击'],['多任务','被奖励的方向未必等于完整目标','任务联系、测量不均衡','列完整任务表，再看考核表'],['团队','个人只得到一部分边际产出','共同产出、支付预算','算清最后一单位产出归谁'],['产权','投资者未必拿到全部投资回报','不可契约投入、事后议价','写明不合作时资产还能做什么']]),
-'<p>四章都先从个人目标求最优反应，再评估规则。区别在于：隐藏的行为是什么、支付能依赖什么、谁能承诺什么，以及哪个资源或控制权受到约束。</p>',
-box('<strong>拿到一个新问题，先写五行</strong><ol><li>参与者与时间顺序。</li><li>每个人选择什么、看得见什么。</li><li>每个人的收益与真实成本。</li><li>允许的合同、预算或控制权。</li><li>要比较的效率基准。</li></ol>','green'),
-'<p>如果暂时写不出函数，也可以先把因果方向写具体。函数应当让你的机制可以被检查，而不是给直觉加一层符号。</p>'
-],{refs:['STOLE','HM91','H82','GH86'],note:'回到你开课时写的问题。现在用这五行重新表述。'}),
-P('s-exam','离开讲义前，做四个短题','综合测验',10,[
-'<p>不查公式，先写个人目标和约束。答案不只是数字，还要注明模型范围。</p>',
-det('开放题：同一岗位同时有四种问题','<p>教学情境：两名工程师维护共同设备；维修数量易测，复检难测；设备所有者与工程师需定期重新谈合作。请分别指出四章分析的对象。参考：工资按随机产出支付产生风险保险问题；数量奖金可能改变复检努力；共同结果分成产生个人边际激励缺口；不可契约的专用技能投资受产权与事后议价影响。不能把所有问题都归因于“激励不足”。</p>')
-],{refs:['STOLE','HM91','H82','GH86'],quiz:[
-N('s-a','单任务：$r=1,c=1,@sigma=2,u_0=0$。线性合同中的最优奖金是多少？',.2,.001,'$b^*=1/(1+1@times1@times4)=0.2$。噪声标准差 2，对应方差 4。'),
-N('s-b','多任务：$b_1=b_2=1,@rho=0.5$。两任务相同，单项努力是多少？',2/3,.001,'对称时 $b=e+@rho e$，所以 $e=1/1.5=2/3$，处于内点。'),
-N('s-c','团队：4 人等分，$c=1$。每人努力相对第一最佳的比例是多少？',.25,.001,'均衡每人 0.25，第一最佳为 1，比例 1/4。不要把这个比例误当作总剩余比例。'),
-N('s-d','产权：$A=B=1,@theta=0.5$。买方拥有与卖方拥有的总剩余差是多少？',0,.001,'由对称性两种产权的总剩余相同；投资分配会互换。也可用 $A^2-B^2=0$ 直接检查。')
-],note:'选一道曾答错的题，写出错误来自哪个假设或哪一步推导。'}),
-P('s-reading','文献与后续阅读','来源说明',4,[
-'<p>以下列出本讲义使用的文献。优先链接作者、大学与期刊页面。部分原论文需要机构访问，已尽量提供公开托管版本。课程的数值案例、练习、图形和教学特例为自编内容，经典思想及框架按页标注。</p>',
-'<div id="all-sources"></div>',
-'<h2>怎样继续读</h2><ol><li>先读 Stole §2.1.1，核对 IC、IR 与一阶条件；再看 §2.1.3 的线性模型。</li><li>读 Holmström–Milgrom 的任务测量与工作设计论述，比较原文的广义设定与本讲的二次成本特例。</li><li>读 Holmström (1982) 的团队部分，把不可能性的条件逐条抄出；用 Border 的笔记核对一般证明。</li><li>读 Hart 的讲演建立概念，再读 Grossman–Hart 的模型与 Aghion–Holden 的回顾，留意结论对合同与议价设定的依赖。</li></ol>',
-'<p>建议隔一天使用右上角“复习卡”，先写或说出答案，再展开。每张卡可以标记“需重练”，用于下一次集中复习。你保存的笔记和作答记录可以导出为 Markdown。</p>',
-'<p class="source-note">正文文风经过针对套话与机械总结的检索和编辑；网络上的所谓“AI 味”清单只作为写作偏好，不是识别作者身份的可靠证据，也不构成经济学知识来源。</p>'
-],{refs:[]})
-]});
-window.COURSE={sources,chapters};
-})();

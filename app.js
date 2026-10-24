@@ -14,15 +14,27 @@ const esc=s=>String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll
 function persist(){try{localStorage.setItem(KEY,JSON.stringify(state));}catch{if(storageOK){storageOK=false;warnStorage();}}}
 function warnStorage(){if(!document.querySelector('.storage-warning')){const x=document.createElement('p');x.className='storage-warning';x.textContent='浏览器未允许保存本地数据。本次仍可学习，请及时导出笔记。';document.querySelector('.masthead').after(x);}}
 function typeset(el){if(window.renderMathInElement)renderMathInElement(el,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false,trust:false,strict:'warn'});}
-function referenceHTML(ids){if(!ids?.length)return '';return '<section class="references"><h2>本页依据</h2><ol>'+[...new Set(ids)].map(id=>'<li><a href="'+esc(sources[id].url)+'" target="_blank" rel="noopener noreferrer">'+sources[id].label+'</a><p>'+sources[id].note+'</p></li>').join('')+'</ol></section>';}
+function questionPath(p){
+ const ch=p.chapter;if(!ch.questions)return '';
+ const q=p.question>=0?ch.questions[p.question]:null,map=ch.pages.find(x=>/-map$/.test(x.id));
+ return '<div class="question-context"><p>总问题：'+ch.problem+'</p><span>'+(q?'第 '+(p.question+1)+' 问 / '+ch.questions.length+' · '+q.title:'先看情境和整章问题')+'</span>'+(map&&map.id!==p.id?'<button class="text-link" data-page="'+map.id+'">查看问题关系 →</button>':'')+'</div>';
+}
 function quizHTML(q,print=false){const a=state.answers[q.id],d=state.drafts[q.id]??a?.value??'';return '<section class="quiz" id="quiz-'+q.id+'"><form data-quiz="'+q.id+'"><fieldset><legend>'+q.prompt+'</legend>'+(q.numeric?'<label for="input-'+q.id+'">数值答案</label><br><input class="answer-input" id="input-'+q.id+'" name="value" type="number" step="any" inputmode="decimal" value="'+esc(d)+'" required>':q.options.map((o,i)=>'<label class="option"><input type="radio" name="value" value="'+i+'" '+(String(d)===String(i)?'checked':'')+' required><span>'+o+'</span></label>').join(''))+'</fieldset><button type="submit" class="primary">检查答案</button></form><div class="feedback '+(a?(a.correct?'correct':'wrong'):'')+'" aria-live="polite" '+(!a&&!print?'hidden':'')+'>'+(print?'<strong>答案：</strong>'+(q.numeric?String(Number(q.answer.toFixed(5))):q.options[q.answer])+'。'+q.explanation:a?'<strong>'+(a.correct?'正确。':'这次还不对。')+'</strong> '+q.explanation+'<p>已检查 '+a.tries+' 次。</p>':'')+'</div></section>';}
 function renderSidebar(ch){
   const done=Object.keys(state.done).filter(id=>state.done[id]&&byId.has(id)).length;
-  sidebar.innerHTML='<button data-page="start">课程首页</button>'+chapters.map(c=>'<button class="chapter-btn '+(ch?.id===c.id?'current':'')+'" data-page="'+c.pages[0].id+'">'+c.number+' '+c.title.split('：')[0]+'</button>'+(ch?.id===c.id?'<nav class="steps" aria-label="本章页码">'+c.pages.map((p,i)=>'<button class="'+(p.id===pages[active]?.id?'current ':'')+(state.done[p.id]?'done':'')+'" data-page="'+p.id+'" '+(p.id===pages[active]?.id?'aria-current="page"':'')+'>'+(i+1)+'. '+p.title.split('｜').pop()+'</button>').join('')+'</nav>':'')).join('')+'<div class="sidebar-meta">已标记完成 '+done+' / '+pages.length+' 页<progress value="'+done+'" max="'+pages.length+'" aria-label="已标记完成页数"></progress><p>键盘 ← → 翻页<br>点击完成，自定进度</p></div>';
+  sidebar.innerHTML='<button data-page="start">课程首页</button>'+chapters.map(c=>'<button class="chapter-btn '+(ch?.id===c.id?'current':'')+'" data-page="'+c.pages[0].id+'">'+c.number+' '+c.title.split('：')[0]+'</button>'+(ch?.id===c.id?'<nav class="steps" aria-label="本章页码">'+sidebarSteps(c)+'</nav>':'')).join('')+'<div class="sidebar-meta">已标记完成 '+done+' / '+pages.length+' 页<progress value="'+done+'" max="'+pages.length+'" aria-label="已标记完成页数"></progress><p>键盘 ← → 翻页</p></div>';
+}
+function sidebarSteps(ch){
+ let previous=null;return ch.pages.map((p,i)=>{
+  const group=p.question??-1;
+  const heading=ch.questions&&group!==previous?'<p class="step-group">'+(group<0?'开场与问题':(group+1)+'. '+ch.questions[group].title)+'</p>':'';
+  previous=group;
+  return heading+'<button class="'+(p.id===pages[active]?.id?'current ':'')+(state.done[p.id]?'done':'')+'" data-page="'+p.id+'" '+(p.id===pages[active]?.id?'aria-current="page"':'')+'>'+(i+1)+'. '+p.title.split('｜').pop()+'</button>';
+ }).join('');
 }
 function articleHTML(p,print=false){
  const ch=p.chapter,step=ch.pages.findIndex(x=>x.id===p.id)+1;
- return '<article data-page-id="'+p.id+'"><div class="eyebrow"><span class="num">'+ch.number+'</span><span>'+ch.title+'</span><span>'+p.phase+' · '+p.minutes+' 分钟</span></div><h1>'+p.title+'</h1>'+p.body+(p.quiz||[]).map(q=>quizHTML(q,print)).join('')+(p.note?'<section class="notes"><label for="note-'+p.id+'">写下你的判断</label><p>'+p.note+'</p><textarea id="note-'+p.id+'" data-note="'+p.id+'" placeholder="用自己的话写，可在右上角导出。">'+esc(state.notes[p.id]||'')+'</textarea><span class="note-status" aria-live="polite">'+(state.notes[p.id]?'已保存在此浏览器':'仅保存在此浏览器')+'</span></section>':'')+referenceHTML(p.refs)+'<div class="complete-row"><button data-complete="'+p.id+'" class="'+(state.done[p.id]?'':'primary')+'">'+(state.done[p.id]?'✓ 已完成本页':'标记本页完成')+'</button><span>本章第 '+step+' / '+ch.pages.length+' 页</span></div></article>';
+ return '<article data-page-id="'+p.id+'"><div class="eyebrow"><span class="num">'+ch.number+'</span><span>'+ch.title+'</span><span>'+p.minutes+' 分钟</span></div>'+questionPath(p)+'<h1>'+p.title+'</h1>'+p.body+(p.quiz||[]).map(q=>quizHTML(q,print)).join('')+'<div class="complete-row"><button data-complete="'+p.id+'" class="'+(state.done[p.id]?'':'primary')+'">'+(state.done[p.id]?'✓ 已完成本页':'标记本页完成')+'</button><span>本章第 '+step+' / '+ch.pages.length+' 页</span></div></article>';
 }
 function renderPage(id){
  const p=byId.get(id)||byId.get('start');active=p.index;state.page=p.id;persist();
@@ -38,7 +50,7 @@ function renderPage(id){
  document.getElementById('prevBtn').disabled=active===0;
  document.getElementById('nextBtn').disabled=active===pages.length-1;
  document.getElementById('pagebar').hidden=false;
- document.title=p.title+'｜组织的数学';
+ document.title=p.id==='start'?'组织的数学｜交互讲义':p.title+'｜组织的数学';
  window.scrollTo({top:0,behavior:'instant'});
  main.focus({preventScroll:true});
 }
@@ -55,7 +67,6 @@ function bindPage(p){
    const out=form.nextElementSibling;out.hidden=false;out.className='feedback '+(correct?'correct':'wrong');out.innerHTML=math('<strong>'+(correct?'正确。':'这次还不对。')+'</strong> '+q.explanation+'<p>已检查 '+state.answers[q.id].tries+' 次。</p>');typeset(out);
   });
  });
- main.querySelectorAll('[data-note]').forEach(el=>el.addEventListener('input',()=>{state.notes[el.dataset.note]=el.value;persist();el.nextElementSibling.textContent=storageOK?'已保存在此浏览器':'本次未能保存，请导出笔记';}));
  const complete=main.querySelector('[data-complete]');complete?.addEventListener('click',()=>{state.done[p.id]=!state.done[p.id];persist();complete.textContent=state.done[p.id]?'✓ 已完成本页':'标记本页完成';complete.classList.toggle('primary',!state.done[p.id]);renderSidebar(p.chapter);});
 }
 document.addEventListener('click',e=>{if(e.target.closest('.skip')){e.preventDefault();main.focus();return;}const b=e.target.closest('[data-page]');if(b)navigate(b.dataset.page);});
@@ -167,11 +178,11 @@ function renderReview(){
 document.getElementById('reviewBtn').onclick=()=>navigate('review');
 function strip(s){const d=document.createElement('div');d.innerHTML=s;return math(d.textContent||'');}
 document.getElementById('exportBtn').onclick=()=>{
- const lines=['# 组织的数学｜学习笔记','', '导出时间：'+new Date().toLocaleString('zh-CN'),'', '学习数据仅来自此浏览器。',''];
+ const lines=['# 组织的数学｜学习记录','', '导出时间：'+new Date().toLocaleString('zh-CN'),'', '学习数据仅来自此浏览器。原版本已保存的笔记一并保留。',''];
  for(const ch of chapters){lines.push('## '+ch.number+' '+ch.title,'');for(const p of ch.pages){if(state.notes[p.id])lines.push('### '+p.title,'',state.notes[p.id],'');for(const q of p.quiz||[]){const a=state.answers[q.id];if(a)lines.push('- '+strip(q.prompt), '  - 我的答案：'+(q.numeric?a.value:strip(q.options[Number(a.value)]))+'；'+(a.correct?'正确':'需重做')+'；尝试 '+a.tries+' 次','  - 解释：'+strip(q.explanation),'');}if(p.memory)lines.push('### 公式卡','',strip(p.memory.question),'',strip(p.memory.answer),'');}}
  lines.push('## 实验参数','',JSON.stringify(state.labs,null,2),'','## 复习卡自评','');cards.forEach(c=>{const v=state.review[c.page+'|'+c.question];if(v)lines.push('- '+strip(c.question)+'：'+(v==='weak'?'需重练':'已会'));});
  lines.push('','## 文献','',...Object.values(sources).map(s=>'- '+s.label+' '+s.url));
- const blob=new Blob([lines.join('\n')],{type:'text/markdown;charset=utf-8'});const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='组织经济学-学习笔记.md';a.click();setTimeout(()=>URL.revokeObjectURL(url),2000);
+ const blob=new Blob([lines.join('\n')],{type:'text/markdown;charset=utf-8'});const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='组织经济学-学习记录.md';a.click();setTimeout(()=>URL.revokeObjectURL(url),2000);
 };
 function printView(){
  document.body.classList.add('print-view');main.innerHTML=math('<article><h1>组织的数学</h1><p>四章交互讲义 · 完整阅读与打印版</p><p>实验在本版显示初始参数及对应结果。请返回常规页面操作滑块；本版显示所有题目答案。</p><button id="printNow">打印 / 保存为 PDF</button></article>'+pages.map(p=>articleHTML(p,true)).join(''));
