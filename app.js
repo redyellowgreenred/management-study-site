@@ -6,8 +6,8 @@ const byId=new Map(pages.map((p,i)=>[p.id,{...p,index:i}]));
 const main=document.querySelector('main'),sidebar=document.getElementById('sidebar');
 const KEY='organization-math-v1';let storageOK=true,loaded={};
 try{loaded=JSON.parse(localStorage.getItem(KEY)||'{}')||{};}catch{storageOK=false;}
-const state={page:'start',done:{},notes:{},drafts:{},answers:{},labs:{},review:{},...loaded};
-for(const key of ['done','notes','drafts','answers','labs','review'])if(!state[key]||typeof state[key]!=='object')state[key]={};
+const state={page:'start',done:{},notes:{},drafts:{},answers:{},labs:{},review:{},walks:{},...loaded};
+for(const key of ['done','notes','drafts','answers','labs','review','walks'])if(!state[key]||typeof state[key]!=='object')state[key]={};
 let active=0,reviewIndex=0,reviewReveal=false,weakOnly=false;
 const math=s=>String(s).replaceAll('@',String.fromCharCode(92));
 const esc=s=>String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#39;");
@@ -33,12 +33,19 @@ function sidebarSteps(ch){
   return heading+'<button class="'+(p.id===pages[active]?.id?'current ':'')+(state.done[p.id]?'done':'')+'" data-page="'+p.id+'" '+(p.id===pages[active]?.id?'aria-current="page"':'')+'>'+(i+1)+'. '+p.title.split('｜').pop()+'</button>';
  }).join('');
 }
+function walkthroughBody(p,print){
+ if(!p.walkthrough)return p.body;
+ const steps=p.walkthrough,shown=print?steps.length:Math.max(1,Math.min(steps.length,Number(state.walks[p.id])||1));
+ const html='<section class="walkthrough" data-walkthrough-box><div class="walkthrough-heading"><h2>推导过程</h2><span data-walk-status aria-live="polite">'+(print?'完整推导':'已展开 '+shown+' / '+steps.length+' 步')+'</span></div><ol>'+steps.map((s,i)=>'<li data-walk-step '+(i>=shown?'hidden':'')+'><h3>'+s.title+'</h3>'+s.body+'</li>').join('')+'</ol>'+(!print?'<div class="walkthrough-controls"><button class="primary" data-walk-next '+(shown===steps.length?'hidden':'')+'>展开下一步</button><button data-walk-all '+(shown===steps.length?'hidden':'')+'>全部展开</button><button data-walk-reset '+(shown===1?'hidden':'')+'>收起重读</button><a href="#math">数学备查</a></div>':'')+'</section>';
+ return p.body.replace(/<div data-walkthrough="[^"]+"><\/div>/,html);
+}
 function articleHTML(p,print=false){
  const ch=p.chapter,step=ch.pages.findIndex(x=>x.id===p.id)+1;
- return '<article data-page-id="'+p.id+'"><div class="eyebrow"><span class="num">'+ch.number+'</span><span>'+ch.title+'</span><span>'+p.minutes+' 分钟</span></div>'+questionPath(p)+'<h1>'+p.title+'</h1>'+p.body+(p.quiz||[]).map(q=>quizHTML(q,print)).join('')+'<div class="complete-row"><button data-complete="'+p.id+'" class="'+(state.done[p.id]?'':'primary')+'">'+(state.done[p.id]?'✓ 已完成本页':'标记本页完成')+'</button><span>本章第 '+step+' / '+ch.pages.length+' 页</span></div></article>';
+ return '<article data-page-id="'+p.id+'"><div class="eyebrow"><span class="num">'+ch.number+'</span><span>'+ch.title+'</span><span>'+p.minutes+' 分钟</span></div>'+questionPath(p)+'<h1>'+p.title+'</h1>'+walkthroughBody(p,print)+(p.quiz||[]).map(q=>quizHTML(q,print)).join('')+'<div class="complete-row"><button data-complete="'+p.id+'" class="'+(state.done[p.id]?'':'primary')+'">'+(state.done[p.id]?'✓ 已完成本页':'标记本页完成')+'</button><span>本章第 '+step+' / '+ch.pages.length+' 页</span></div></article>';
 }
 function renderPage(id){
  const p=byId.get(id)||byId.get('start');active=p.index;state.page=p.id;persist();
+ document.body.classList.remove('nav-open');document.getElementById('menuBtn')?.setAttribute('aria-expanded','false');
  main.innerHTML=math(articleHTML(p));renderSidebar(p.chapter);
  const route=main.querySelector('#course-route');
  if(route)route.innerHTML=chapters.filter(c=>['agency','multitask','teams','ownership'].includes(c.id)).map(c=>'<button data-page="'+c.pages[0].id+'"><span>'+c.number+'</span><span><b>'+c.title+'</b><span class="desc">'+c.short+'</span></span><em>'+c.duration+' →</em></button>').join('');
@@ -59,6 +66,11 @@ function renderPage(id){
 }
 function navigate(id){if(location.hash==='#'+id)route();else location.hash=id;}
 function bindPage(p){
+ main.querySelectorAll('[data-walkthrough-box]').forEach(box=>{
+  const steps=[...box.querySelectorAll('[data-walk-step]')],next=box.querySelector('[data-walk-next]'),all=box.querySelector('[data-walk-all]'),reset=box.querySelector('[data-walk-reset]');let shown=steps.filter(step=>!step.hidden).length;
+  const update=()=>{steps.forEach((el,i)=>el.hidden=i>=shown);box.querySelector('[data-walk-status]').textContent='已展开 '+shown+' / '+steps.length+' 步';next.hidden=shown===steps.length;all.hidden=shown===steps.length;reset.hidden=shown===1;state.walks[p.id]=shown;persist();};
+  next.onclick=()=>{shown=Math.min(steps.length,shown+1);update();};all.onclick=()=>{shown=steps.length;update();};reset.onclick=()=>{shown=1;update();};
+ });
  main.querySelectorAll('form[data-quiz]').forEach(form=>{
   const q=p.quiz.find(q=>q.id===form.dataset.quiz);
   form.addEventListener('change',()=>{const val=new FormData(form).get('value');state.drafts[q.id]=val;persist();});
@@ -81,11 +93,12 @@ function saveTakeaways(id){
 document.addEventListener('click',e=>{if(e.target.closest('.skip')){e.preventDefault();main.focus();return;}const save=e.target.closest('[data-save-takeaway]');if(save){saveTakeaways(save.dataset.saveTakeaway);return;}const b=e.target.closest('[data-page]');if(b)navigate(b.dataset.page);});
 document.getElementById('prevBtn').onclick=()=>{if(active>0)navigate(pages[active-1].id);};
 document.getElementById('nextBtn').onclick=()=>{if(active<pages.length-1)navigate(pages[active+1].id);};
+document.getElementById('menuBtn')?.addEventListener('click',()=>{const open=document.body.classList.toggle('nav-open');document.getElementById('menuBtn').setAttribute('aria-expanded',String(open));});
 document.addEventListener('keydown',e=>{if(e.altKey||e.ctrlKey||e.metaKey||e.shiftKey||/INPUT|TEXTAREA|SELECT|BUTTON|SUMMARY/.test(document.activeElement?.tagName)||document.activeElement?.closest('.plot')||document.activeElement?.isContentEditable||location.hash==='#review')return;if(e.key==='ArrowRight'&&active<pages.length-1){e.preventDefault();navigate(pages[active+1].id);}if(e.key==='ArrowLeft'&&active>0){e.preventDefault();navigate(pages[active-1].id);}});
 const fmt=(n,d=3)=>Number(n.toFixed(d)).toString();
 function stat(label,value){return '<div class="stat"><span>'+label+'</span><b>'+fmt(value)+'</b></div>';}
 function control(key,label,min,max,step,value){return '<div class="control"><label for="lab-'+key+'">'+label+'<output id="out-'+key+'">'+value+'</output></label><input id="lab-'+key+'" data-key="'+key+'" type="range" min="'+min+'" max="'+max+'" step="'+step+'" value="'+value+'"></div>';}
-function chartLine({title,series,xMax,yMin=0,yMax,marker,xlabel='奖金 b'}){
+function chartLine({title,series,xMax,yMin=0,yMax,marker,xlabel='提成 b'}){
  const W=760,H=340,L=70,R=28,T=32,B=64,pw=W-L-R,ph=H-T-B;
  const sx=x=>L+x/xMax*pw,sy=y=>T+(yMax-y)/(yMax-yMin)*ph;
  let svg='<svg class="chart" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+esc(title)+'"><title>'+esc(title)+'</title>';
@@ -104,17 +117,19 @@ function chartBars(title,items,max){
 function initLab(el,print=false){
  const type=el.dataset.lab;
  const defs={
-  agency:{title:'激励与风险',defaults:{b:.5,c:1,r:1,sigma:1},inputs:[['b','奖金 b',0,1.5,.01],['c','成本系数 c',.5,3,.1],['r','风险厌恶 r',0,3,.1],['sigma','标准差 σ',0,3,.1]]},
-  attention:{title:'一天的时间如何分配',defaults:{bonus:.2,base:.5,k:1},inputs:[['bonus','数量奖金 b',0,1,.01],['base','基准份额 t₀',.1,.8,.05],['k','偏离成本 k',.5,3,.1]]},
-  multitask:{title:'任务之间的反应',defaults:{b1:.8,b2:.6,rho:.5},inputs:[['b1','任务 1 奖金 b₁',0,2,.01],['b2','任务 2 奖金 b₂',0,2,.01],['rho','成本联系 ρ',-.8,.8,.05]]},
+  agency:{title:'激励与风险',defaults:{b:.5,c:1,r:1,sigma:1},inputs:[['b','提成 b',0,1.5,.01],['c','成本系数 c',.5,3,.1],['r','风险厌恶 r',0,3,.1],['sigma','标准差 σ',0,3,.1]]},
+  attention:{title:'一天的时间如何分配',defaults:{bonus:.2,base:.5,k:1},inputs:[['bonus','数量提成 b',0,1,.01],['base','原接单比例 t₀',.1,.8,.05],['k','改变分配的成本 k',.5,3,.1]]},
+  multitask:{title:'任务之间的反应',defaults:{b1:.8,b2:.6,rho:.5},inputs:[['b1','接单奖金 b₁',0,2,.01],['b2','复检奖金 b₂',0,2,.01],['rho','成本联系 ρ',-.8,.8,.05]]},
   team:{title:'等分团队与第一最佳',defaults:{n:4,teamC:1},inputs:[['n','团队人数 n',1,12,1],['teamC','成本系数 c',.5,3,.1]]},
-  ownership:{title:'资产与投资激励',defaults:{A:2,B:1,theta:.6,owner:'buyer'},inputs:[['A','买方生产率 A',.5,3,.1],['B','卖方生产率 B',.5,3,.1],['theta','可回收比例 θ',0,1,.05]]}
+  ownership:{title:'资产与投资激励',defaults:{A:2,B:1,theta:.6,owner:'buyer'},inputs:[['A','买方投入效率 A',.5,3,.1],['B','卖方投入效率 B',.5,3,.1],['theta','保留价值比例 θ',0,1,.05]]}
  };
  const def=defs[type];if(!def)return;
+ const mission=!print?window.COURSE.labMissions?.[type]:null;
  const values={...def.defaults,...(print?{}:state.labs[type])};
  const select=type==='ownership'?'<label for="owner-select">当前所有者</label><select id="owner-select"><option value="buyer">买方拥有资产</option><option value="seller">卖方拥有资产</option></select>':'';
  el.className='experiment';
- el.innerHTML='<h2>'+def.title+'</h2>'+select+'<div class="controls">'+def.inputs.map(([key,label,min,max,step])=>control(key,label,min,max,step,values[key])).join('')+'</div>'+(type==='agency'?'<button data-optimal>使用最优奖金</button>':'')+'<button data-reset>恢复初始参数</button><div class="exp-result" aria-live="polite"></div><div class="plot" tabindex="0" role="region" aria-label="实验图形，可横向滚动"></div><div class="chart-caption"></div>';
+ const missionHTML=mission?'<section class="lab-mission"><h3>用这个情境试一次</h3><p>'+mission.question+'</p><div class="mission-options" role="group" aria-label="选择你的预测">'+mission.options.map((option,i)=>'<button data-mission-choice="'+i+'" aria-pressed="false">'+option+'</button>').join('')+'</div><div class="mission-actions"><button data-mission-start>设置题目起点</button><button class="primary" data-mission-run disabled>选择后运行情境</button></div><div data-mission-feedback class="feedback" aria-live="polite" hidden></div></section>':'';
+ el.innerHTML='<h2>'+def.title+'</h2>'+missionHTML+select+'<div class="controls">'+def.inputs.map(([key,label,min,max,step])=>control(key,label,min,max,step,values[key])).join('')+'</div>'+(type==='agency'?'<button data-optimal>使用最优奖金</button>':'')+'<button data-reset>恢复初始参数</button><div class="exp-result" aria-live="polite"></div><div class="plot" tabindex="0" role="region" aria-label="实验图形，可横向滚动"></div><div class="chart-caption"></div>';
  const result=el.querySelector('.exp-result'),plot=el.querySelector('.plot'),caption=el.querySelector('.chart-caption');
  const sel=el.querySelector('select');if(sel)sel.value=values.owner;
  function update(){
@@ -123,30 +138,30 @@ function initLab(el,print=false){
   if(type==='agency'){
    const z=M.agency(values),f=b=>M.agency({...values,b}).surplus;
    const ys=Array.from({length:121},(_,i)=>f(i*1.5/120));
-   result.innerHTML='<div class="stats">'+stat('实际努力 e',z.e)+stat('最优奖金 b*',z.bStar)+stat('净剩余 / 利润',z.surplus)+stat('风险溢价',z.risk)+'</div><p>固定工资 a = '+fmt(z.a)+'；第一最佳努力 = '+fmt(z.firstBest)+'。固定工资随参数调整，保持员工 CE = 0。</p>';
+   result.innerHTML='<div class="stats">'+stat('实际努力 e',z.e)+stat('最优提成 b*',z.bStar)+stat('老板利润',z.surplus)+stat('风险溢价',z.risk)+'</div><p>固定工资 a = '+fmt(z.a)+'；第一最佳努力 = '+fmt(z.firstBest)+'。固定工资随参数调整，保持员工 CE = 0。</p>';
    plot.innerHTML=chartLine({title:'线性奖金下的公司利润；虚线为当前奖金',series:[{fn:f,color:'#b02f29'}],xMax:1.5,yMin:Math.min(0,...ys)*1.05,yMax:Math.max(.1,...ys)*1.15,marker:values.b});
    caption.textContent='红线：扣除努力成本与风险溢价后的公司利润（u₀=0）；虚线：当前奖金。纵轴为模型货币单位。';
   }else if(type==='attention'){
    const t=Math.min(1,Math.max(0,values.base+values.bonus/values.k)),cost=values.k*(t-values.base)**2/2;
-   result.innerHTML='<div class="stats">'+stat('数量任务时间',t)+stat('另一任务时间',1-t)+stat('偏离成本',cost)+'</div><p>总时间固定为 1；本实验不把数量指标直接当作总绩效。</p>';
-   plot.innerHTML=chartBars('时间份额',[{label:'数量任务',value:t,color:'#b02f29'},{label:'另一任务',value:1-t,color:'#13777c'}],1);
+   result.innerHTML='<div class="stats">'+stat('接单时间占比',t)+stat('复检时间占比',1-t)+stat('改变分配的代价',cost)+'</div><p>总时间固定为 1；本实验不把数量指标直接当作总绩效。</p>';
+   plot.innerHTML=chartBars('时间份额',[{label:'接单',value:t,color:'#b02f29'},{label:'复检',value:1-t,color:'#13777c'}],1);
    caption.textContent='两条长度之和始终为 1。t* = clip(t₀ + b/k, 0, 1)；这是带偏好基准的固定时间教学例子。';
   }else if(type==='multitask'){
    const z=M.multi(values),f1=x=>M.multi({...values,b1:x}).e1,f2=x=>M.multi({...values,b1:x}).e2;
    const ymax=Math.max(1,...Array.from({length:121},(_,i)=>Math.max(f1(i/60),f2(i/60))))*1.12;
-   result.innerHTML='<div class="stats">'+stat('任务 1 努力 e₁',z.e1)+stat('任务 2 努力 e₂',z.e2)+stat('总努力成本',z.cost)+'</div><p>'+ (z.corner?'当前在非负约束边界，内点交叉导数不适用。':'当前两任务均为正，内点公式适用。')+'</p>';
-   plot.innerHTML=chartLine({title:'两任务努力随任务一奖金变化',series:[{fn:f1,color:'#b02f29'},{fn:f2,color:'#13777c'}],xMax:2,yMax:ymax,marker:values.b1,xlabel:'任务 1 奖金 b₁'});
-   caption.textContent='红线：任务 1；青线：任务 2。横轴只改变 b₁，b₂ 与 ρ 保持滑块值。纵轴为努力。程序按非负努力求解。';
+   result.innerHTML='<div class="stats">'+stat('接单努力 e₁',z.e1)+stat('复检努力 e₂',z.e2)+stat('总努力成本',z.cost)+'</div><p>'+ (z.corner?'至少一项努力已降到零。这里按边界条件计算，不再沿用两项都做时的变化率。':'两项工作都在做，可以使用本页联立方程的解。')+'</p>';
+   plot.innerHTML=chartLine({title:'两任务努力随任务一奖金变化',series:[{fn:f1,color:'#b02f29'},{fn:f2,color:'#13777c'}],xMax:2,yMax:ymax,marker:values.b1,xlabel:'接单奖金 b₁'});
+   caption.textContent='红线：接单；青线：复检。横轴只改变 b₁，b₂ 与 ρ 保持滑块值。纵轴为努力。程序按非负努力求解。';
   }else if(type==='team'){
    const z=M.team({n:values.n,c:values.teamC});
-   result.innerHTML='<div class="stats">'+stat('每人均衡努力',z.e)+stat('每人第一最佳',z.fb)+stat('总产出（均衡）',z.total)+stat('总产出（基准）',z.fbTotal)+'</div><p>均衡总剩余 '+fmt(z.surplus)+'；第一最佳总剩余 '+fmt(z.fbSurplus)+'；总剩余比 '+fmt(z.surplus/z.fbSurplus)+'。</p>';
+   result.innerHTML='<div class="stats">'+stat('每人均衡努力',z.e)+stat('每人努力（基准）',z.fb)+stat('总产出（均衡）',z.total)+stat('总产出（基准）',z.fbTotal)+'</div><p>均衡总净收益 '+fmt(z.surplus)+'；第一最佳总净收益 '+fmt(z.fbSurplus)+'；总净收益比 '+fmt(z.surplus/z.fbSurplus)+'。</p>';
    plot.innerHTML=chartBars('等分收入与第一最佳的总产出比较',[{label:'等分均衡产出',value:z.total,color:'#b02f29'},{label:'第一最佳产出',value:z.fbTotal,color:'#69752d'}],Math.max(z.fbTotal,1/values.teamC)*1.1);
    caption.textContent='比较产出时保持成员生产率与成本相同。人数变化不引入技术收益或协调成本；总剩余已扣除所有努力成本。';
   }else if(type==='ownership'){
    const {A,B,theta}=values,zb=M.ownership({A,B,alpha:theta,beta:0}),zs=M.ownership({A,B,alpha:0,beta:theta}),z=values.owner==='buyer'?zb:zs;
-   result.innerHTML='<div class="stats">'+stat('买方投资 i',z.i)+stat('卖方投资 j',z.j)+stat('当前总净剩余',z.surplus)+stat('第一最佳剩余',z.fb)+'</div><p>买方拥有 − 卖方拥有的净剩余差 = '+fmt(zb.surplus-zs.surplus)+'。当前不合作收益 dB = '+fmt(z.db)+'，dS = '+fmt(z.ds)+'。</p>';
-   plot.innerHTML=chartBars('两种产权与第一最佳的净剩余',[{label:'买方拥有',value:zb.surplus,color:'#b02f29'},{label:'卖方拥有',value:zs.surplus,color:'#13777c'},{label:'第一最佳',value:z.fb,color:'#69752d'}],z.fb*1.1);
-   caption.textContent='净剩余 = 合作价值 − 双方投资成本。固定资产转移价格在双方内部抵消。本例只改变外部收益，不改变合作技术。';
+   result.innerHTML='<div class="stats">'+stat('买方投资 i',z.i)+stat('卖方投资 j',z.j)+stat('当前总净收益',z.surplus)+stat('第一最佳净收益',z.fb)+'</div><p>买方拥有 − 卖方拥有的净收益差 = '+fmt(zb.surplus-zs.surplus)+'。当前不合作收益 dB = '+fmt(z.db)+'，dS = '+fmt(z.ds)+'。</p>';
+   plot.innerHTML=chartBars('两种产权与第一最佳的总净收益',[{label:'买方拥有',value:zb.surplus,color:'#b02f29'},{label:'卖方拥有',value:zs.surplus,color:'#13777c'},{label:'第一最佳',value:z.fb,color:'#69752d'}],z.fb*1.1);
+   caption.textContent='净收益 = 合作价值 − 双方投资成本。固定资产转移价格在双方内部抵消。本例只改变外部收益，不改变合作技术。';
   }
   caption.textContent+=' 窄屏可左右滚动图形。';
  }
@@ -154,6 +169,14 @@ function initLab(el,print=false){
  sel?.addEventListener('change',()=>{values.owner=sel.value;update();});
  el.querySelector('[data-reset]').onclick=()=>{Object.assign(values,def.defaults);if(sel)sel.value=values.owner;update();};
  el.querySelector('[data-optimal]')?.addEventListener('click',()=>{values.b=M.agency(values).bStar;update();});
+ if(mission){
+  let choice=null;const feedback=el.querySelector('[data-mission-feedback]'),run=el.querySelector('[data-mission-run]'),options=[...el.querySelectorAll('[data-mission-choice]')];
+  const clear=()=>{feedback.hidden=true;};
+  options.forEach(button=>button.addEventListener('click',()=>{choice=Number(button.dataset.missionChoice);options.forEach(b=>b.setAttribute('aria-pressed',String(b===button)));run.disabled=false;run.textContent='运行这一情境';clear();}));
+  el.querySelector('[data-mission-start]').onclick=()=>{Object.assign(values,mission.before);if(sel)sel.value=values.owner;update();clear();};
+  run.onclick=()=>{if(choice===null)return;Object.assign(values,mission.after);if(sel)sel.value=values.owner;update();feedback.hidden=false;feedback.className='feedback '+(choice===mission.answer?'correct':'wrong');feedback.innerHTML='<strong>'+(choice===mission.answer?'预测正确。':'这次预测与模型结果不同。')+'</strong> '+mission.explanation;};
+  el.querySelectorAll('input,select').forEach(input=>input.addEventListener('input',clear));el.querySelector('[data-reset]').addEventListener('click',clear);el.querySelector('[data-optimal]')?.addEventListener('click',clear);
+ }
  update();
 }
 const cards=chapters.flatMap(ch=>ch.pages.filter(p=>p.memory).map(p=>({...p.memory,chapter:ch.number,page:p.id}))).concat([
